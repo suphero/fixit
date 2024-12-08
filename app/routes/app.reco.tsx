@@ -7,26 +7,46 @@ import {
   IndexTable,
   Button,
   Text,
+  InlineGrid,
 } from "@shopify/polaris";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import type { Recommendation } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import {
-  initializeNoImageProductSuggestions,
-  listNoImageProductSuggestions,
+  initializeNoImageProducts,
+  listNoImageProducts,
+  initializeShortTitleProducts,
+  listShortTitleProducts,
 } from "../models/reco.server";
 
 export async function loader({ request }: any) {
   const { session } = await authenticate.admin(request);
-  const recommendations = await listNoImageProductSuggestions(session.shop);
-  return json({ recommendations: recommendations || [] });
+  const noImageProducts = await listNoImageProducts(session.shop);
+  const shortTitleProducts = await listShortTitleProducts(session.shop);
+  return json({
+    noImageProducts,
+    shortTitleProducts,
+  });
 }
 
 export async function action({ request }: any) {
+  const formData = await request.formData();
+  const actionType = formData.get("actionType");
   const { admin, session } = await authenticate.admin(request);
-  await initializeNoImageProductSuggestions(session.shop, admin.graphql);
-  const recommendations = await listNoImageProductSuggestions(session.shop);
-  return json({ recommendations });
+
+  if (actionType === "NO_IMAGE") {
+    await initializeNoImageProducts(session.shop, admin.graphql);
+  } else if (actionType === "SHORT_TITLE") {
+    await initializeShortTitleProducts(session.shop, admin.graphql);
+  }
+
+  const noImageProducts = await listNoImageProducts(session.shop);
+  const shortTitleProducts = await listShortTitleProducts(session.shop);
+
+  return json({
+    noImageProducts,
+    shortTitleProducts,
+  });
 }
 
 function truncate(str: string, { length = 25 } = {}) {
@@ -74,33 +94,49 @@ const RecommendationRow = ({
 );
 
 export default function Index() {
-  const { recommendations } = useLoaderData<{ recommendations: Recommendation[] }>();
-  const fetcher = useFetcher<{ recommendations: Recommendation[] }>();
+  const { noImageProducts, shortTitleProducts } = useLoaderData<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[] }>();
+  const fetcher = useFetcher<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[] }>();
 
-  const handleInitialize = () => {
-    fetcher.submit(null, { method: "post" });
+  const handleInitialize = (actionType: string) => {
+    fetcher.submit({ actionType }, { method: "post" });
   };
 
   return (
-    <Page
-      title="Recommendations"
-      primaryAction={
-        <Button
-          onClick={handleInitialize}
-          loading={fetcher.state === "submitting"}
-        >
-          Initialize
-        </Button>
-      }
-    >
+    <Page title="Recommendations">
       <Layout>
         <Layout.Section>
           <Card roundedAbove="sm">
-            <Text as="h2" variant="headingSm">
-              Products with No Images
-            </Text>
+            <InlineGrid columns="1fr auto">
+              <Text as="h2" variant="headingSm">
+                No Image Products
+              </Text>
+              <Button
+                onClick={() => handleInitialize("NO_IMAGE")}
+                loading={fetcher.state === "submitting"}
+                accessibilityLabel="Initialize"
+              >
+                Initialize
+              </Button>
+            </InlineGrid>
             <RecommendationTable
-              recommendations={fetcher.data?.recommendations || recommendations}
+              recommendations={fetcher.data?.noImageProducts || noImageProducts}
+            />
+          </Card>
+          <Card roundedAbove="sm">
+            <InlineGrid columns="1fr auto">
+              <Text as="h2" variant="headingSm">
+                Short Title Products
+              </Text>
+              <Button
+                onClick={() => handleInitialize("SHORT_TITLE")}
+                loading={fetcher.state === "submitting"}
+                accessibilityLabel="Initialize"
+              >
+                Initialize
+              </Button>
+            </InlineGrid>
+            <RecommendationTable
+              recommendations={fetcher.data?.shortTitleProducts || shortTitleProducts}
             />
           </Card>
         </Layout.Section>

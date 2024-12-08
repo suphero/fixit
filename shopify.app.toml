@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "d713d4c7b0fc50d65d4a1554ba059827"
-application_url = "https://instant-enemy-posters-receipt.trycloudflare.com"
+application_url = "https://environments-framing-engagement-enhancements.trycloudflare.com"
 embedded = true
 name = "[DEV] Smart Forecast"
 handle = "dev-p-smart-forecast"
@@ -19,9 +19,9 @@ api_version = "2022-07"
 
 [auth]
 redirect_urls = [
-  "https://instant-enemy-posters-receipt.trycloudflare.com/auth/callback",
-  "https://instant-enemy-posters-receipt.trycloudflare.com/auth/shopify/callback",
-  "https://instant-enemy-posters-receipt.trycloudflare.com/api/auth/callback"
+  "https://environments-framing-engagement-enhancements.trycloudflare.com/auth/callback",
+  "https://environments-framing-engagement-enhancements.trycloudflare.com/auth/shopify/callback",
+  "https://environments-framing-engagement-enhancements.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
