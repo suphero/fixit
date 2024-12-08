@@ -1,46 +1,28 @@
-import type { GraphQLClient } from "graphql-request";
+import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 import db from "../db.server";
-
-type ProductNode = {
-  id: string;
-  title: string;
-  images: {
-    nodes: { url: string }[];
-  };
-};
-
-type ProductResponse = {
-  products: {
-    edges: { node: ProductNode; cursor: string }[];
-    pageInfo: {
-      hasNextPage: boolean;
-    };
-  };
-};
 
 export async function initializeNoImageProductSuggestions(
   shop: string,
-  graphql: GraphQLClient,
-): Promise<void> {
-  db.recommendation.deleteMany({
-    where: { recommendationType: "NO_IMAGE" },
+  graphql: AdminGraphqlClient,
+) {
+  await db.recommendation.deleteMany({
+    where: { recommendationType: "NO_IMAGE", shop },
   });
+
   let hasNextPage = true;
-  let cursor: string | null = null;
+  let cursor = null;
 
   while (hasNextPage) {
-    const response: ProductResponse = await graphql.request(
+    const response: any = await graphql(
       `
-        query getProductsWithoutImages($first: Int!, $after: String) {
-          products(first: $first, after: $after) {
+        query getNoImageProducts($cursor: String) {
+          products(first: 50, after: $cursor, query: "media:missing status:active") {
             edges {
               node {
                 id
                 title
-                images(first: 1) {
-                  nodes {
-                    url
-                  }
+                featuredMedia {
+                  id
                 }
               }
               cursor
@@ -52,40 +34,52 @@ export async function initializeNoImageProductSuggestions(
         }
       `,
       {
-        first: 100,
-        after: cursor,
+        variables: {
+          cursor,
+        },
       },
     );
 
-    const productsWithoutImages = response.products.edges.filter(
-      ({ node }) => node.images.nodes.length === 0,
-    );
+    const {
+      data: {
+        products: { edges, pageInfo },
+      },
+    } = await response.json();
 
-    for (const { node: product } of productsWithoutImages) {
-      await db.recommendation.create({
-        data: {
-          shop,
-          targetType: "PRODUCT",
-          targetValue: product.id,
-          recommendationType: "NO_IMAGE",
-          currentValue: "No image found",
-          status: "PENDING",
-          reason: `Product '${product.title}' has no image`,
-          userActionRequired: true,
-          actions: {
-            create: {
-              actionType: "UPLOAD_IMAGE",
-              suggestedValue: "Upload an image for this product",
+    // Filter products without images and save them to the database
+    const noImageProducts = edges
+      .filter(({ node }: any) => node.featuredMedia === null)
+      .map(({ node }: any) => ({
+        id: node.id,
+        title: node.title
+      }));
+
+    if (noImageProducts.length > 0) {
+      for (const product of noImageProducts) {
+        await db.recommendation.create({
+          data: {
+            shop,
+            targetType: "PRODUCT",
+            targetId: product.id,
+            targetTitle: product.title,
+            recommendationType: "NO_IMAGE",
+            status: "PENDING",
+            userActionRequired: true,
+            actions: {
+              create: {
+                actionType: "UPLOAD_IMAGE",
+                suggestedValue: "Upload an image for this product",
+              },
             },
           },
-        },
-      });
+        });
+      }
     }
 
-    hasNextPage = response.products.pageInfo.hasNextPage;
+    // Update pagination info
+    hasNextPage = pageInfo.hasNextPage;
     if (hasNextPage) {
-      cursor =
-        response.products.edges[response.products.edges.length - 1].cursor;
+      cursor = edges[edges.length - 1].cursor;
     }
   }
 }
@@ -93,8 +87,8 @@ export async function initializeNoImageProductSuggestions(
 export async function listNoImageProductSuggestions(shop: string): Promise<
   Array<{
     id: string;
-    targetValue: string;
-    reason: string;
+    targetId: string;
+    targetTitle: string;
     createdAt: Date;
   }>
 > {
@@ -103,14 +97,16 @@ export async function listNoImageProductSuggestions(shop: string): Promise<
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
-      targetValue: true,
-      reason: true,
+      targetId: true,
+      targetTitle: true,
       createdAt: true,
     },
   });
 }
 
-export async function countNoImageProductSuggestions(shop: string): Promise<number> {
+export async function countNoImageProductSuggestions(
+  shop: string,
+): Promise<number> {
   return await db.recommendation.count({
     where: { recommendationType: "NO_IMAGE", shop },
   });
