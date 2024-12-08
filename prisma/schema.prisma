@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  session_id    String    @id @default(auto()) @map("_id") @db.ObjectId
+  id            String    @unique
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+}
+
+model Recommendation {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop                String
+  targetType          TargetType
+  targetValue         String
+  recommendationType  RecommendationType
+  currentValue        String
+  actions             RecommendationAction[]
+  status              RecommendationStatus @default(PENDING)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  reason              String
+  userActionRequired  Boolean  @default(false)
+}
+
+model RecommendationAction {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  recommendationId    String   @db.ObjectId
+  actionType          ActionType
+  suggestedValue      String
+  metadata            Json?    // Optional extra details for flexibility
+  recommendation      Recommendation @relation(fields: [recommendationId], references: [id])
+}
+
+enum TargetType {
+  PRODUCT
+  PRODUCT_VARIANT
+}
+
+enum RecommendationType {
+  UNDERSTOCK
+  OVERSTOCK
+  UNDERPRICED
+  OVERPRICED
+  NO_COST
+  SALE_AT_LOSS
+  NO_STOCK
+  PASSIVE
+  NO_IMAGE
+  SHORT_TITLE
+  LONG_TITLE
+  SHORT_DESCRIPTION
+  LONG_DESCRIPTION
+  LOW_DISCOUNT
+  HIGH_DISCOUNT
+}
+
+enum ActionType {
+  INCREASE_PRICE
+  DECREASE_PRICE
+  INCREASE_COST
+  DECREASE_COST
+  INCREASE_STOCK
+  DECREASE_STOCK
+  UPDATE_TITLE
+  UPDATE_DESCRIPTION
+  UPLOAD_IMAGE
+  ARCHIVE_PRODUCT
+  NOTIFY_USER
+}
+
+enum RecommendationStatus {
+  PENDING
+  RESOLVED
+  IGNORED
+}
+
+model Settings {
+  id                      String   @id @default(auto()) @map("_id") @db.ObjectId
+  shopId                  String
+  understockDays          Int      @default(3)
+  overstockDays           Int      @default(30)
+  minRevenueRate          Float    @default(0.2)
+  maxRevenueRate          Float    @default(0.8)
+  passiveDays             Int      @default(90)
+  shortTitleLength        Int      @default(10)
+  longTitleLength         Int      @default(100)
+  shortDescriptionLength  Int      @default(50)
+  longDescriptionLength   Int      @default(500)
+  lowDiscountRate         Float    @default(0.1)
+  highDiscountRate        Float    @default(0.5)
+  noStockAction           NoStockAction @default(HIDE)
+  passiveAction           PassiveAction @default(ARCHIVE)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+enum NoStockAction {
+  HIDE
+  NOTIFY
+}
+
+enum PassiveAction {
+  ARCHIVE
+  REDUCE_PRICE
+}
