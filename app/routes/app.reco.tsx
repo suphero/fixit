@@ -1,3 +1,4 @@
+// app/routes/app.reco.tsx
 import { json } from "@remix-run/node";
 import {
   Page,
@@ -7,74 +8,76 @@ import {
   Button,
   Text,
 } from "@shopify/polaris";
-import { useLoaderData, Link, useFetcher } from "@remix-run/react";
+import { useLoaderData, useFetcher } from "@remix-run/react";
 import type { Recommendation } from "@prisma/client";
 import { authenticate } from "../shopify.server";
-import { initializeNoImageProductSuggestions, listNoImageProductSuggestions } from "../models/reco.server";
+import {
+  initializeNoImageProductSuggestions,
+  listNoImageProductSuggestions,
+} from "../models/reco.server";
 
 export async function loader({ request }: any) {
   const { session } = await authenticate.admin(request);
-  const recos = await listNoImageProductSuggestions(session.shop);
-
-  return json({
-    recos: recos || []
-  });
+  const recommendations = await listNoImageProductSuggestions(session.shop);
+  return json({ recommendations: recommendations || [] });
 }
 
 export async function action({ request }: any) {
   const { admin, session } = await authenticate.admin(request);
   await initializeNoImageProductSuggestions(session.shop, admin.graphql);
-  return json({ success: true });
+  const recommendations = await listNoImageProductSuggestions(session.shop);
+  return json({ recommendations });
 }
 
 function truncate(str: string, { length = 25 } = {}) {
-  if (!str) return "";
-  if (str.length <= length) return str;
-  return str.slice(0, length) + "…";
+  return str?.length > length ? str.slice(0, length) + "…" : str || "";
 }
 
-const QRTable = ({ recos }: any) => (
+// Reusable Table Component
+const RecommendationTable = ({
+  recommendations,
+}: {
+  recommendations: Recommendation[];
+}) => (
   <IndexTable
     resourceName={{
       singular: "Recommendation",
       plural: "Recommendations",
     }}
-    itemCount={recos.length}
+    itemCount={recommendations.length}
     headings={[
       { title: "Title" },
       { title: "Date created" },
     ]}
     selectable={false}
-    pagination={{
-      hasNext: true,
-      hasPrevious: false,
-      label: "1-1 of 1",
-      onNext: () => {},
-      onPrevious: () => {},
-    }}
   >
-    {recos.map((reco: any) => (
-      <QRTableRow key={reco.id} reco={reco} />
+    {recommendations.map((recommendation) => (
+      <RecommendationRow key={recommendation.id} recommendation={recommendation} />
     ))}
   </IndexTable>
 );
 
-const QRTableRow = ({ reco }: any) => (
-  <IndexTable.Row id={reco.id} position={reco.id}>
+// Reusable Table Row Component
+const RecommendationRow = ({
+  recommendation,
+}: {
+  recommendation: Recommendation;
+}) => (
+  <IndexTable.Row id={recommendation.id} position={recommendation.id}>
     <IndexTable.Cell>
-      <Link to={`qrcodes/${reco.id}`}>{truncate(reco.targetTitle)}</Link>
+      <Text>{truncate(recommendation.targetTitle)}</Text>
     </IndexTable.Cell>
     <IndexTable.Cell>
-      {new Date(reco.createdAt).toDateString()}
+      {new Date(recommendation.createdAt).toDateString()}
     </IndexTable.Cell>
   </IndexTable.Row>
 );
 
 export default function Index() {
-  const { recos } = useLoaderData<{ recos: Recommendation[] }>();
-  const fetcher = useFetcher<{ recos: Recommendation[] }>();
+  const { recommendations } = useLoaderData<{ recommendations: Recommendation[] }>();
+  const fetcher = useFetcher<{ recommendations: Recommendation[] }>();
 
-  const handleInitialize = async () => {
+  const handleInitialize = () => {
     fetcher.submit(null, { method: "post" });
   };
 
@@ -82,7 +85,10 @@ export default function Index() {
     <Page
       title="Recommendations"
       primaryAction={
-        <Button variant="primary" onClick={handleInitialize} loading={fetcher.state === "submitting"}>
+        <Button
+          onClick={handleInitialize}
+          loading={fetcher.state === "submitting"}
+        >
           Initialize
         </Button>
       }
@@ -91,9 +97,11 @@ export default function Index() {
         <Layout.Section>
           <Card roundedAbove="sm">
             <Text as="h2" variant="headingSm">
-              Product with no image
+              Products with No Images
             </Text>
-            <QRTable recos={fetcher.data?.recos || recos} />
+            <RecommendationTable
+              recommendations={fetcher.data?.recommendations || recommendations}
+            />
           </Card>
         </Layout.Section>
       </Layout>
