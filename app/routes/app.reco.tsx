@@ -17,15 +17,19 @@ import {
   listNoImageProducts,
   initializeShortTitleProducts,
   listShortTitleProducts,
+  initializeLongTitleProducts,
+  listLongTitleProducts,
 } from "../models/reco.server";
 
 export async function loader({ request }: any) {
   const { session } = await authenticate.admin(request);
   const noImageProducts = await listNoImageProducts(session.shop);
   const shortTitleProducts = await listShortTitleProducts(session.shop);
+  const longTitleProducts = await listLongTitleProducts(session.shop);
   return json({
     noImageProducts,
     shortTitleProducts,
+    longTitleProducts,
   });
 }
 
@@ -38,6 +42,8 @@ export async function action({ request }: any) {
     await initializeNoImageProducts(session.shop, admin.graphql);
   } else if (actionType === "SHORT_TITLE") {
     await initializeShortTitleProducts(session.shop, admin.graphql);
+  } else if (actionType === "LONG_TITLE") {
+    await initializeLongTitleProducts(session.shop, admin.graphql);
   }
 
   const noImageProducts = await listNoImageProducts(session.shop);
@@ -94,8 +100,8 @@ const RecommendationRow = ({
 );
 
 export default function Index() {
-  const { noImageProducts, shortTitleProducts } = useLoaderData<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[] }>();
-  const fetcher = useFetcher<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[] }>();
+  const { noImageProducts, shortTitleProducts, longTitleProducts } = useLoaderData<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[] }>();
+  const fetcher = useFetcher<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[] }>();
 
   const handleInitialize = (actionType: string) => {
     fetcher.submit({ actionType }, { method: "post" });
@@ -137,6 +143,23 @@ export default function Index() {
             </InlineGrid>
             <RecommendationTable
               recommendations={fetcher.data?.shortTitleProducts || shortTitleProducts}
+            />
+          </Card>
+          <Card roundedAbove="sm">
+            <InlineGrid columns="1fr auto">
+              <Text as="h2" variant="headingSm">
+                Long Title Products
+              </Text>
+              <Button
+                onClick={() => handleInitialize("LONG_TITLE")}
+                loading={fetcher.state === "submitting"}
+                accessibilityLabel="Initialize"
+              >
+                Initialize
+              </Button>
+            </InlineGrid>
+            <RecommendationTable
+              recommendations={fetcher.data?.longTitleProducts || longTitleProducts}
             />
           </Card>
         </Layout.Section>

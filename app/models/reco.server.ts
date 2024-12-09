@@ -210,3 +210,106 @@ export async function listShortTitleProducts(shop: string): Promise<
     },
   });
 }
+
+export async function initializeLongTitleProducts(
+  shop: string,
+  graphql: AdminGraphqlClient,
+) {
+  await db.recommendation.deleteMany({
+    where: { recommendationType: "LONG_TITLE", shop },
+  });
+
+  let hasNextPage = true;
+  let cursor = null;
+
+  while (hasNextPage) {
+    const response: any = await graphql(
+      `
+        query getLongTitleProducts($cursor: String) {
+          products(
+            first: 50
+            after: $cursor
+            query: "status:active"
+          ) {
+            edges {
+              node {
+                id
+                title
+              }
+              cursor
+            }
+            pageInfo {
+              hasNextPage
+            }
+          }
+        }
+      `,
+      {
+        variables: {
+          cursor,
+        },
+      },
+    );
+
+    const {
+      data: {
+        products: { edges, pageInfo },
+      },
+    } = await response.json();
+
+    const longTitleProducts = edges
+      .filter(({ node }: any) => node.title.length > 50)
+      .map(({ node }: any) => ({
+        id: node.id,
+        title: node.title,
+      }));
+
+    if (longTitleProducts.length > 0) {
+      for (const product of longTitleProducts) {
+        await db.recommendation.create({
+          data: {
+            shop,
+            targetType: "PRODUCT",
+            targetId: product.id,
+            targetTitle: product.title,
+            recommendationType: "LONG_TITLE",
+            status: "PENDING",
+            userActionRequired: true,
+            actions: {
+              create: {
+                actionType: "UPDATE_TITLE",
+                suggestedValue: "Consider using a shorter title",
+              },
+            },
+          },
+        });
+      }
+    }
+
+    // Update pagination info
+    hasNextPage = pageInfo.hasNextPage;
+    if (hasNextPage) {
+      cursor = edges[edges.length - 1].cursor;
+    }
+  }
+}
+
+export async function listLongTitleProducts(shop: string): Promise<
+  Array<{
+    id: string;
+    targetId: string;
+    targetTitle: string;
+    createdAt: Date;
+  }>
+> {
+  return await db.recommendation.findMany({
+    where: { recommendationType: "LONG_TITLE", shop },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      targetId: true,
+      targetTitle: true,
+      createdAt: true,
+    },
+  });
+}
