@@ -4,6 +4,9 @@ import db from "../db.server";
 // NO_IMAGE -> ARCHIVE / UPLOAD_IMAGE
 // SHORT_TITLE -> UPDATE_TITLE
 // LONG_TITLE -> UPDATE_TITLE
+// SHORT_DESCRIPTION -> UPDATE_DESCRIPTION
+// LONG_DESCRIPTION -> UPDATE_DESCRIPTION
+// NO_STOCK -> ARCHIVE
 
 const PRODUCT_RECOMMENDATION_CRITERIA = {
   NO_IMAGE: {
@@ -31,6 +34,11 @@ const PRODUCT_RECOMMENDATION_CRITERIA = {
     actionType: "UPDATE_DESCRIPTION",
     suggestedValue: "Consider using a shorter description",
   },
+  NO_STOCK: {
+    filter: (node: any) => node.totalInventory === 0,
+    actionType: "ARCHIVE_PRODUCT",
+    suggestedValue: "Archive this product",
+  },
 };
 
 export async function initializeAllProducts(
@@ -55,6 +63,7 @@ export async function initializeAllProducts(
                 id
                 title
                 description
+                totalInventory
                 featuredMedia {
                   id
                 }

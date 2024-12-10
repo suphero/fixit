@@ -24,12 +24,14 @@ export async function loader({ request }: any) {
   const longTitleProducts = await listProductsByType(session.shop, "LONG_TITLE");
   const shortDescriptionProducts = await listProductsByType(session.shop, "SHORT_DESCRIPTION");
   const longDescriptionProducts = await listProductsByType(session.shop, "LONG_DESCRIPTION");
+  const noStockProducts = await listProductsByType(session.shop, "NO_STOCK");
   return json({
     noImageProducts,
     shortTitleProducts,
     longTitleProducts,
     shortDescriptionProducts,
-    longDescriptionProducts
+    longDescriptionProducts,
+    noStockProducts
   });
 }
 
@@ -42,13 +44,15 @@ export async function action({ request }: any) {
   const longTitleProducts = await listProductsByType(session.shop, "LONG_TITLE");
   const shortDescriptionProducts = await listProductsByType(session.shop, "SHORT_DESCRIPTION");
   const longDescriptionProducts = await listProductsByType(session.shop, "LONG_DESCRIPTION");
+  const noStockProducts = await listProductsByType(session.shop, "NO_STOCK");
 
   return json({
     noImageProducts,
     shortTitleProducts,
     longTitleProducts,
     shortDescriptionProducts,
-    longDescriptionProducts
+    longDescriptionProducts,
+    noStockProducts
   });
 }
 
@@ -92,8 +96,8 @@ const RecommendationRow = ({
 );
 
 export default function Index() {
-  const { noImageProducts, shortTitleProducts, longTitleProducts, shortDescriptionProducts, longDescriptionProducts } = useLoaderData<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[] }>();
-  const fetcher = useFetcher<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[] }>();
+  const { noImageProducts, shortTitleProducts, longTitleProducts, shortDescriptionProducts, longDescriptionProducts, noStockProducts } = useLoaderData<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[], noStockProducts: Recommendation[] }>();
+  const fetcher = useFetcher<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[], noStockProducts: Recommendation[] }>();
 
   const handleInitialize = () => {
     fetcher.submit(null, { method: "post" });
@@ -162,6 +166,16 @@ export default function Index() {
             </InlineGrid>
             <RecommendationTable
               recommendations={fetcher.data?.longDescriptionProducts || longDescriptionProducts}
+            />
+          </Card>
+          <Card roundedAbove="sm">
+            <InlineGrid columns="1fr auto">
+              <Text as="h2" variant="headingSm">
+                No Stock Products
+              </Text>
+            </InlineGrid>
+            <RecommendationTable
+              recommendations={fetcher.data?.noStockProducts || noStockProducts}
             />
           </Card>
         </Layout.Section>
