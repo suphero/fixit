@@ -13,19 +13,15 @@ import { useLoaderData, useFetcher } from "@remix-run/react";
 import type { Recommendation } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import {
-  initializeNoImageProducts,
-  listNoImageProducts,
-  initializeShortTitleProducts,
-  listShortTitleProducts,
-  initializeLongTitleProducts,
-  listLongTitleProducts,
+  initializeAllProducts,
+  listProductsByType
 } from "../models/reco.server";
 
 export async function loader({ request }: any) {
   const { session } = await authenticate.admin(request);
-  const noImageProducts = await listNoImageProducts(session.shop);
-  const shortTitleProducts = await listShortTitleProducts(session.shop);
-  const longTitleProducts = await listLongTitleProducts(session.shop);
+  const noImageProducts = await listProductsByType(session.shop, "NO_IMAGE");
+  const shortTitleProducts = await listProductsByType(session.shop, "SHORT_TITLE");
+  const longTitleProducts = await listProductsByType(session.shop, "LONG_TITLE");
   return json({
     noImageProducts,
     shortTitleProducts,
@@ -34,24 +30,17 @@ export async function loader({ request }: any) {
 }
 
 export async function action({ request }: any) {
-  const formData = await request.formData();
-  const actionType = formData.get("actionType");
   const { admin, session } = await authenticate.admin(request);
+  await initializeAllProducts(session.shop, admin.graphql);
 
-  if (actionType === "NO_IMAGE") {
-    await initializeNoImageProducts(session.shop, admin.graphql);
-  } else if (actionType === "SHORT_TITLE") {
-    await initializeShortTitleProducts(session.shop, admin.graphql);
-  } else if (actionType === "LONG_TITLE") {
-    await initializeLongTitleProducts(session.shop, admin.graphql);
-  }
-
-  const noImageProducts = await listNoImageProducts(session.shop);
-  const shortTitleProducts = await listShortTitleProducts(session.shop);
+  const noImageProducts = await listProductsByType(session.shop, "NO_IMAGE");
+  const shortTitleProducts = await listProductsByType(session.shop, "SHORT_TITLE");
+  const longTitleProducts = await listProductsByType(session.shop, "LONG_TITLE");
 
   return json({
     noImageProducts,
     shortTitleProducts,
+    longTitleProducts,
   });
 }
 
@@ -103,12 +92,23 @@ export default function Index() {
   const { noImageProducts, shortTitleProducts, longTitleProducts } = useLoaderData<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[] }>();
   const fetcher = useFetcher<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[] }>();
 
-  const handleInitialize = (actionType: string) => {
-    fetcher.submit({ actionType }, { method: "post" });
+  const handleInitialize = () => {
+    fetcher.submit(null, { method: "post" });
   };
 
   return (
-    <Page title="Recommendations">
+    <Page
+      title="Recommendations"
+      primaryAction={
+        <Button
+          variant="primary"
+          onClick={() => handleInitialize()}
+          loading={fetcher.state === "submitting"}
+          accessibilityLabel="Initialize">
+            Initialize
+        </Button>
+      }
+    >
       <Layout>
         <Layout.Section>
           <Card roundedAbove="sm">
@@ -116,13 +116,6 @@ export default function Index() {
               <Text as="h2" variant="headingSm">
                 No Image Products
               </Text>
-              <Button
-                onClick={() => handleInitialize("NO_IMAGE")}
-                loading={fetcher.state === "submitting"}
-                accessibilityLabel="Initialize"
-              >
-                Initialize
-              </Button>
             </InlineGrid>
             <RecommendationTable
               recommendations={fetcher.data?.noImageProducts || noImageProducts}
@@ -133,13 +126,6 @@ export default function Index() {
               <Text as="h2" variant="headingSm">
                 Short Title Products
               </Text>
-              <Button
-                onClick={() => handleInitialize("SHORT_TITLE")}
-                loading={fetcher.state === "submitting"}
-                accessibilityLabel="Initialize"
-              >
-                Initialize
-              </Button>
             </InlineGrid>
             <RecommendationTable
               recommendations={fetcher.data?.shortTitleProducts || shortTitleProducts}
@@ -150,13 +136,6 @@ export default function Index() {
               <Text as="h2" variant="headingSm">
                 Long Title Products
               </Text>
-              <Button
-                onClick={() => handleInitialize("LONG_TITLE")}
-                loading={fetcher.state === "submitting"}
-                accessibilityLabel="Initialize"
-              >
-                Initialize
-              </Button>
             </InlineGrid>
             <RecommendationTable
               recommendations={fetcher.data?.longTitleProducts || longTitleProducts}
