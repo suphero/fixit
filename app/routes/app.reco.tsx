@@ -22,10 +22,14 @@ export async function loader({ request }: any) {
   const noImageProducts = await listProductsByType(session.shop, "NO_IMAGE");
   const shortTitleProducts = await listProductsByType(session.shop, "SHORT_TITLE");
   const longTitleProducts = await listProductsByType(session.shop, "LONG_TITLE");
+  const shortDescriptionProducts = await listProductsByType(session.shop, "SHORT_DESCRIPTION");
+  const longDescriptionProducts = await listProductsByType(session.shop, "LONG_DESCRIPTION");
   return json({
     noImageProducts,
     shortTitleProducts,
     longTitleProducts,
+    shortDescriptionProducts,
+    longDescriptionProducts
   });
 }
 
@@ -36,11 +40,15 @@ export async function action({ request }: any) {
   const noImageProducts = await listProductsByType(session.shop, "NO_IMAGE");
   const shortTitleProducts = await listProductsByType(session.shop, "SHORT_TITLE");
   const longTitleProducts = await listProductsByType(session.shop, "LONG_TITLE");
+  const shortDescriptionProducts = await listProductsByType(session.shop, "SHORT_DESCRIPTION");
+  const longDescriptionProducts = await listProductsByType(session.shop, "LONG_DESCRIPTION");
 
   return json({
     noImageProducts,
     shortTitleProducts,
     longTitleProducts,
+    shortDescriptionProducts,
+    longDescriptionProducts
   });
 }
 
@@ -48,12 +56,7 @@ function truncate(str: string, { length = 25 } = {}) {
   return str?.length > length ? str.slice(0, length) + "…" : str || "";
 }
 
-// Reusable Table Component
-const RecommendationTable = ({
-  recommendations,
-}: {
-  recommendations: Recommendation[];
-}) => (
+const RecommendationTable = ({ recommendations }: { recommendations: Recommendation[] }) => (
   <IndexTable
     resourceName={{
       singular: "Recommendation",
@@ -89,8 +92,8 @@ const RecommendationRow = ({
 );
 
 export default function Index() {
-  const { noImageProducts, shortTitleProducts, longTitleProducts } = useLoaderData<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[] }>();
-  const fetcher = useFetcher<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[] }>();
+  const { noImageProducts, shortTitleProducts, longTitleProducts, shortDescriptionProducts, longDescriptionProducts } = useLoaderData<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[] }>();
+  const fetcher = useFetcher<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[] }>();
 
   const handleInitialize = () => {
     fetcher.submit(null, { method: "post" });
@@ -139,6 +142,26 @@ export default function Index() {
             </InlineGrid>
             <RecommendationTable
               recommendations={fetcher.data?.longTitleProducts || longTitleProducts}
+            />
+          </Card>
+          <Card roundedAbove="sm">
+            <InlineGrid columns="1fr auto">
+              <Text as="h2" variant="headingSm">
+                Short Description Products
+              </Text>
+            </InlineGrid>
+            <RecommendationTable
+              recommendations={fetcher.data?.shortDescriptionProducts || shortDescriptionProducts}
+            />
+          </Card>
+          <Card roundedAbove="sm">
+            <InlineGrid columns="1fr auto">
+              <Text as="h2" variant="headingSm">
+                Long Description Products
+              </Text>
+            </InlineGrid>
+            <RecommendationTable
+              recommendations={fetcher.data?.longDescriptionProducts || longDescriptionProducts}
             />
           </Card>
         </Layout.Section>

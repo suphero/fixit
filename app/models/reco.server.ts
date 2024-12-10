@@ -1,6 +1,10 @@
 import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 import db from "../db.server";
 
+// NO_IMAGE -> ARCHIVE / UPLOAD_IMAGE
+// SHORT_TITLE -> UPDATE_TITLE
+// LONG_TITLE -> UPDATE_TITLE
+
 const PRODUCT_RECOMMENDATION_CRITERIA = {
   NO_IMAGE: {
     filter: (node: any) => node.featuredMedia === null,
@@ -16,6 +20,16 @@ const PRODUCT_RECOMMENDATION_CRITERIA = {
     filter: (node: any) => node.title.length > 50,
     actionType: "UPDATE_TITLE",
     suggestedValue: "Consider using a shorter title",
+  },
+  SHORT_DESCRIPTION: {
+    filter: (node: any) => node.description.length < 100,
+    actionType: "UPDATE_DESCRIPTION",
+    suggestedValue: "Consider using a more descriptive description",
+  },
+  LONG_DESCRIPTION: {
+    filter: (node: any) => node.description.length > 1000,
+    actionType: "UPDATE_DESCRIPTION",
+    suggestedValue: "Consider using a shorter description",
   },
 };
 
@@ -40,6 +54,7 @@ export async function initializeAllProducts(
               node {
                 id
                 title
+                description
                 featuredMedia {
                   id
                 }
