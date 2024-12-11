@@ -14,7 +14,9 @@ import type { Recommendation } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import {
   initializeAllProducts,
-  listProductsByType
+  initializeAllProductVariants,
+  listProductsByType,
+  listProductVariantsByType
 } from "../models/reco.server";
 
 export async function loader({ request }: any) {
@@ -25,19 +27,22 @@ export async function loader({ request }: any) {
   const shortDescriptionProducts = await listProductsByType(session.shop, "SHORT_DESCRIPTION");
   const longDescriptionProducts = await listProductsByType(session.shop, "LONG_DESCRIPTION");
   const noStockProducts = await listProductsByType(session.shop, "NO_STOCK");
+  const noCostProductVariants = await listProductVariantsByType(session.shop, "NO_COST");
   return json({
     noImageProducts,
     shortTitleProducts,
     longTitleProducts,
     shortDescriptionProducts,
     longDescriptionProducts,
-    noStockProducts
+    noStockProducts,
+    noCostProductVariants
   });
 }
 
 export async function action({ request }: any) {
   const { admin, session } = await authenticate.admin(request);
   await initializeAllProducts(session.shop, admin.graphql);
+  await initializeAllProductVariants(session.shop, admin.graphql);
 
   const noImageProducts = await listProductsByType(session.shop, "NO_IMAGE");
   const shortTitleProducts = await listProductsByType(session.shop, "SHORT_TITLE");
@@ -45,6 +50,7 @@ export async function action({ request }: any) {
   const shortDescriptionProducts = await listProductsByType(session.shop, "SHORT_DESCRIPTION");
   const longDescriptionProducts = await listProductsByType(session.shop, "LONG_DESCRIPTION");
   const noStockProducts = await listProductsByType(session.shop, "NO_STOCK");
+  const noCostProductVariants = await listProductVariantsByType(session.shop, "NO_COST");
 
   return json({
     noImageProducts,
@@ -52,11 +58,12 @@ export async function action({ request }: any) {
     longTitleProducts,
     shortDescriptionProducts,
     longDescriptionProducts,
-    noStockProducts
+    noStockProducts,
+    noCostProductVariants
   });
 }
 
-function truncate(str: string, { length = 25 } = {}) {
+function truncate(str: string, { length = 50 } = {}) {
   return str?.length > length ? str.slice(0, length) + "…" : str || "";
 }
 
@@ -96,8 +103,8 @@ const RecommendationRow = ({
 );
 
 export default function Index() {
-  const { noImageProducts, shortTitleProducts, longTitleProducts, shortDescriptionProducts, longDescriptionProducts, noStockProducts } = useLoaderData<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[], noStockProducts: Recommendation[] }>();
-  const fetcher = useFetcher<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[], noStockProducts: Recommendation[] }>();
+  const { noImageProducts, shortTitleProducts, longTitleProducts, shortDescriptionProducts, longDescriptionProducts, noStockProducts, noCostProductVariants } = useLoaderData<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[], noStockProducts: Recommendation[], noCostProductVariants: Recommendation[] }>();
+  const fetcher = useFetcher<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[], noStockProducts: Recommendation[], noCostProductVariants: Recommendation[] }>();
 
   const handleInitialize = () => {
     fetcher.submit(null, { method: "post" });
@@ -176,6 +183,16 @@ export default function Index() {
             </InlineGrid>
             <RecommendationTable
               recommendations={fetcher.data?.noStockProducts || noStockProducts}
+            />
+          </Card>
+          <Card roundedAbove="sm">
+            <InlineGrid columns="1fr auto">
+              <Text as="h2" variant="headingSm">
+                No Cost Product Variants
+              </Text>
+            </InlineGrid>
+            <RecommendationTable
+              recommendations={fetcher.data?.noCostProductVariants || noCostProductVariants}
             />
           </Card>
         </Layout.Section>

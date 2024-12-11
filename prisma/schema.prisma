@@ -75,6 +75,7 @@ enum RecommendationType {
 enum ActionType {
   INCREASE_PRICE
   DECREASE_PRICE
+  DEFINE_COST
   INCREASE_COST
   DECREASE_COST
   INCREASE_STOCK
