@@ -103,8 +103,8 @@ const RecommendationRow = ({
 );
 
 export default function Index() {
-  const { noImageProducts, shortTitleProducts, longTitleProducts, shortDescriptionProducts, longDescriptionProducts, noStockProducts, noCostProductVariants } = useLoaderData<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[], noStockProducts: Recommendation[], noCostProductVariants: Recommendation[] }>();
-  const fetcher = useFetcher<{ noImageProducts: Recommendation[], shortTitleProducts: Recommendation[], longTitleProducts: Recommendation[], shortDescriptionProducts: Recommendation[], longDescriptionProducts: Recommendation[], noStockProducts: Recommendation[], noCostProductVariants: Recommendation[] }>();
+  const data = useLoaderData<Record<string, Recommendation[]>>();
+  const fetcher = useFetcher<Record<string, Recommendation[]>>();
 
   const handleInitialize = () => {
     fetcher.submit(null, { method: "post" });
@@ -132,7 +132,7 @@ export default function Index() {
               </Text>
             </InlineGrid>
             <RecommendationTable
-              recommendations={fetcher.data?.noImageProducts || noImageProducts}
+              recommendations={fetcher.data?.noImageProducts || data.noImageProducts}
             />
           </Card>
           <Card roundedAbove="sm">
@@ -142,7 +142,7 @@ export default function Index() {
               </Text>
             </InlineGrid>
             <RecommendationTable
-              recommendations={fetcher.data?.shortTitleProducts || shortTitleProducts}
+              recommendations={fetcher.data?.shortTitleProducts || data.shortTitleProducts}
             />
           </Card>
           <Card roundedAbove="sm">
@@ -152,7 +152,7 @@ export default function Index() {
               </Text>
             </InlineGrid>
             <RecommendationTable
-              recommendations={fetcher.data?.longTitleProducts || longTitleProducts}
+              recommendations={fetcher.data?.longTitleProducts || data.longTitleProducts}
             />
           </Card>
           <Card roundedAbove="sm">
@@ -162,7 +162,7 @@ export default function Index() {
               </Text>
             </InlineGrid>
             <RecommendationTable
-              recommendations={fetcher.data?.shortDescriptionProducts || shortDescriptionProducts}
+              recommendations={fetcher.data?.shortDescriptionProducts || data.shortDescriptionProducts}
             />
           </Card>
           <Card roundedAbove="sm">
@@ -172,7 +172,7 @@ export default function Index() {
               </Text>
             </InlineGrid>
             <RecommendationTable
-              recommendations={fetcher.data?.longDescriptionProducts || longDescriptionProducts}
+              recommendations={fetcher.data?.longDescriptionProducts || data.longDescriptionProducts}
             />
           </Card>
           <Card roundedAbove="sm">
@@ -182,7 +182,7 @@ export default function Index() {
               </Text>
             </InlineGrid>
             <RecommendationTable
-              recommendations={fetcher.data?.noStockProducts || noStockProducts}
+              recommendations={fetcher.data?.noStockProducts || data.noStockProducts}
             />
           </Card>
           <Card roundedAbove="sm">
@@ -192,7 +192,7 @@ export default function Index() {
               </Text>
             </InlineGrid>
             <RecommendationTable
-              recommendations={fetcher.data?.noCostProductVariants || noCostProductVariants}
+              recommendations={fetcher.data?.noCostProductVariants || data.noCostProductVariants}
             />
           </Card>
         </Layout.Section>

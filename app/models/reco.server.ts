@@ -131,7 +131,6 @@ export async function initializeAllProducts(
   }
 }
 
-
 export async function initializeAllProductVariants(
   shop: string,
   graphql: AdminGraphqlClient,
