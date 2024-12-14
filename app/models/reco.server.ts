@@ -1,4 +1,5 @@
 import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
+import type { RecommendationType } from "@prisma/client";
 import { ActionType, TargetType } from "@prisma/client";
 import db from "../db.server";
 
@@ -214,25 +215,9 @@ export async function initializeAllProductVariants(
   }
 }
 
-export async function listProductsByType(
+export async function findRecommendations(
   shop: string,
-  recommendationType: keyof typeof PRODUCT_RECOMMENDATION_CRITERIA,
-) {
-  return await db.recommendation.findMany({
-    where: { recommendationType, shop },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      targetId: true,
-      targetTitle: true,
-      createdAt: true,
-    },
-  });
-}
-
-export async function listProductVariantsByType(
-  shop: string,
-  recommendationType: keyof typeof PRODUCT_VARIANT_RECOMMENDATION_CRITERIA,
+  recommendationType: RecommendationType,
 ) {
   return await db.recommendation.findMany({
     where: { recommendationType, shop },

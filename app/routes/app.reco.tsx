@@ -11,23 +11,23 @@ import {
 } from "@shopify/polaris";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import type { Recommendation } from "@prisma/client";
+import { RecommendationType } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import {
   initializeAllProducts,
   initializeAllProductVariants,
-  listProductsByType,
-  listProductVariantsByType
+  findRecommendations
 } from "../models/reco.server";
 
 export async function loader({ request }: any) {
   const { session } = await authenticate.admin(request);
-  const noImageProducts = await listProductsByType(session.shop, "NO_IMAGE");
-  const shortTitleProducts = await listProductsByType(session.shop, "SHORT_TITLE");
-  const longTitleProducts = await listProductsByType(session.shop, "LONG_TITLE");
-  const shortDescriptionProducts = await listProductsByType(session.shop, "SHORT_DESCRIPTION");
-  const longDescriptionProducts = await listProductsByType(session.shop, "LONG_DESCRIPTION");
-  const noStockProducts = await listProductsByType(session.shop, "NO_STOCK");
-  const noCostProductVariants = await listProductVariantsByType(session.shop, "NO_COST");
+  const noImageProducts = await findRecommendations(session.shop, RecommendationType.NO_IMAGE);
+  const shortTitleProducts = await findRecommendations(session.shop, RecommendationType.SHORT_TITLE);
+  const longTitleProducts = await findRecommendations(session.shop, RecommendationType.LONG_TITLE);
+  const shortDescriptionProducts = await findRecommendations(session.shop, RecommendationType.SHORT_DESCRIPTION);
+  const longDescriptionProducts = await findRecommendations(session.shop, RecommendationType.LONG_DESCRIPTION);
+  const noStockProducts = await findRecommendations(session.shop, RecommendationType.NO_STOCK);
+  const noCostProductVariants = await findRecommendations(session.shop, RecommendationType.NO_COST);
   return json({
     noImageProducts,
     shortTitleProducts,
@@ -44,13 +44,13 @@ export async function action({ request }: any) {
   await initializeAllProducts(session.shop, admin.graphql);
   await initializeAllProductVariants(session.shop, admin.graphql);
 
-  const noImageProducts = await listProductsByType(session.shop, "NO_IMAGE");
-  const shortTitleProducts = await listProductsByType(session.shop, "SHORT_TITLE");
-  const longTitleProducts = await listProductsByType(session.shop, "LONG_TITLE");
-  const shortDescriptionProducts = await listProductsByType(session.shop, "SHORT_DESCRIPTION");
-  const longDescriptionProducts = await listProductsByType(session.shop, "LONG_DESCRIPTION");
-  const noStockProducts = await listProductsByType(session.shop, "NO_STOCK");
-  const noCostProductVariants = await listProductVariantsByType(session.shop, "NO_COST");
+  const noImageProducts = await findRecommendations(session.shop, RecommendationType.NO_IMAGE);
+  const shortTitleProducts = await findRecommendations(session.shop, RecommendationType.SHORT_TITLE);
+  const longTitleProducts = await findRecommendations(session.shop, RecommendationType.LONG_TITLE);
+  const shortDescriptionProducts = await findRecommendations(session.shop, RecommendationType.SHORT_DESCRIPTION);
+  const longDescriptionProducts = await findRecommendations(session.shop, RecommendationType.LONG_DESCRIPTION);
+  const noStockProducts = await findRecommendations(session.shop, RecommendationType.NO_STOCK);
+  const noCostProductVariants = await findRecommendations(session.shop, RecommendationType.NO_COST);
 
   return json({
     noImageProducts,
@@ -94,7 +94,7 @@ const RecommendationRow = ({
 }) => (
   <IndexTable.Row id={recommendation.id} position={recommendation.id}>
     <IndexTable.Cell>
-      <Text>{truncate(recommendation.targetTitle)}</Text>
+      <Text as={"h2"}>{truncate(recommendation.targetTitle)}</Text>
     </IndexTable.Cell>
     <IndexTable.Cell>
       {new Date(recommendation.createdAt).toDateString()}

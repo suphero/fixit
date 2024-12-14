@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "d713d4c7b0fc50d65d4a1554ba059827"
-application_url = "https://slight-rl-florists-retained.trycloudflare.com"
+application_url = "https://required-inclusive-yeah-nearest.trycloudflare.com"
 embedded = true
 name = "[DEV] Smart Forecast"
 handle = "dev-p-smart-forecast"
@@ -19,9 +19,9 @@ api_version = "2022-07"
 
 [auth]
 redirect_urls = [
-  "https://slight-rl-florists-retained.trycloudflare.com/auth/callback",
-  "https://slight-rl-florists-retained.trycloudflare.com/auth/shopify/callback",
-  "https://slight-rl-florists-retained.trycloudflare.com/api/auth/callback"
+  "https://required-inclusive-yeah-nearest.trycloudflare.com/auth/callback",
+  "https://required-inclusive-yeah-nearest.trycloudflare.com/auth/shopify/callback",
+  "https://required-inclusive-yeah-nearest.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
