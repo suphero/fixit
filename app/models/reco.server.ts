@@ -1,6 +1,6 @@
 import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 import type { RecommendationType } from "@prisma/client";
-import { ActionType, TargetType } from "@prisma/client";
+import { TargetType } from "@prisma/client";
 import db from "../db.server";
 
 // NO_IMAGE -> ARCHIVE / UPLOAD_IMAGE
@@ -14,32 +14,26 @@ import db from "../db.server";
 const PRODUCT_RECOMMENDATION_CRITERIA = {
   NO_IMAGE: {
     filter: (node: any) => node.featuredMedia === null,
-    actionType: ActionType.UPLOAD_IMAGE,
     suggestedValue: "Upload an image for this product",
   },
   SHORT_TITLE: {
     filter: (node: any) => node.title.length < 10,
-    actionType: ActionType.UPDATE_TITLE,
     suggestedValue: "Consider using a more descriptive title",
   },
   LONG_TITLE: {
     filter: (node: any) => node.title.length > 50,
-    actionType: ActionType.UPDATE_TITLE,
     suggestedValue: "Consider using a shorter title",
   },
   SHORT_DESCRIPTION: {
     filter: (node: any) => node.description.length < 100,
-    actionType: ActionType.UPDATE_DESCRIPTION,
     suggestedValue: "Consider using a more descriptive description",
   },
   LONG_DESCRIPTION: {
     filter: (node: any) => node.description.length > 1000,
-    actionType: ActionType.UPDATE_DESCRIPTION,
     suggestedValue: "Consider using a shorter description",
   },
   NO_STOCK: {
     filter: (node: any) => node.totalInventory === 0,
-    actionType: ActionType.DEFINE_COST,
     suggestedValue: "Define a cost for this product variant",
   },
 };
@@ -47,7 +41,6 @@ const PRODUCT_RECOMMENDATION_CRITERIA = {
 const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
   NO_COST: {
     filter: (node: any) => node?.inventoryItem?.unitCost === null,
-    actionType: ActionType.DEFINE_COST,
     suggestedValue: "Add a cost to this variant",
   },
 };
@@ -86,9 +79,7 @@ export async function initializeAllProducts(
           }
         }
       `,
-      {
-        variables: { cursor },
-      },
+      { variables: { cursor } },
     );
 
     const {
@@ -97,33 +88,23 @@ export async function initializeAllProducts(
       },
     } = await response.json();
 
-    for (const { node } of edges) {
-      for (const [type, config] of Object.entries(
-        PRODUCT_RECOMMENDATION_CRITERIA,
-      )) {
-        if (config.filter(node)) {
-          await db.recommendation.create({
-            data: {
-              shop,
-              targetType: TargetType.PRODUCT,
-              targetId: node.id,
-              targetTitle: node.title,
-              recommendationType: type as RecommendationType,
-              status: "PENDING",
-              userActionRequired: true,
-              actions: {
-                create: {
-                  actionType: config.actionType,
-                  suggestedValue: config.suggestedValue,
-                },
-              },
-            },
-          });
-        }
-      }
+    const recommendations = edges.flatMap(({ node }: any) =>
+      Object.entries(PRODUCT_RECOMMENDATION_CRITERIA)
+        .filter(([, config]) => config.filter(node))
+        .map(([type]) => ({
+          shop,
+          targetType: TargetType.PRODUCT,
+          targetId: node.id,
+          targetTitle: node.title,
+          recommendationType: type as RecommendationType,
+          status: "PENDING",
+        })),
+    );
+
+    if (recommendations.length > 0) {
+      await db.recommendation.createMany({ data: recommendations });
     }
 
-    // Update pagination info
     hasNextPage = pageInfo.hasNextPage;
     if (hasNextPage) {
       cursor = edges[edges.length - 1].cursor;
@@ -170,9 +151,7 @@ export async function initializeAllProductVariants(
           }
         }
       `,
-      {
-        variables: { cursor },
-      },
+      { variables: { cursor } },
     );
 
     const {
@@ -181,34 +160,25 @@ export async function initializeAllProductVariants(
       },
     } = await response.json();
 
-    for (const { node } of edges) {
-      for (const [type, config] of Object.entries(
-        PRODUCT_VARIANT_RECOMMENDATION_CRITERIA,
-      )) {
-        if (config.filter(node)) {
-          const title = node.product.hasOnlyDefaultVariant ? node.product.title : `${node.product.title} - ${node.title}`;
-          await db.recommendation.create({
-            data: {
-              shop,
-              targetType: TargetType.PRODUCT_VARIANT,
-              targetId: node.id,
-              targetTitle: title,
-              recommendationType: type as RecommendationType,
-              status: "PENDING",
-              userActionRequired: true,
-              actions: {
-                create: {
-                  actionType: config.actionType,
-                  suggestedValue: config.suggestedValue,
-                },
-              },
-            },
-          });
-        }
-      }
+    const recommendations = edges.flatMap(({ node }: any) =>
+      Object.entries(PRODUCT_VARIANT_RECOMMENDATION_CRITERIA)
+        .filter(([, config]) => config.filter(node))
+        .map(([type]) => ({
+          shop,
+          targetType: TargetType.PRODUCT_VARIANT,
+          targetId: node.id,
+          targetTitle: node.product.hasOnlyDefaultVariant
+            ? node.product.title
+            : `${node.product.title} - ${node.title}`,
+          recommendationType: type as RecommendationType,
+          status: "PENDING",
+        })),
+    );
+
+    if (recommendations.length > 0) {
+      await db.recommendation.createMany({ data: recommendations });
     }
 
-    // Update pagination info
     hasNextPage = pageInfo.hasNextPage;
     if (hasNextPage) {
       cursor = edges[edges.length - 1].cursor;

@@ -33,20 +33,10 @@ model Recommendation {
   targetId            String
   targetTitle         String
   recommendationType  RecommendationType
-  actions             RecommendationAction[] @relation("RecommendationActions")
   status              RecommendationStatus @default(PENDING)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   userActionRequired  Boolean  @default(false)
-}
-
-model RecommendationAction {
-  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
-  recommendationId    String   @db.ObjectId
-  actionType          ActionType
-  suggestedValue      String
-  metadata            Json?
-  recommendation      Recommendation @relation(fields: [recommendationId], references: [id], name: "RecommendationActions", onDelete: Cascade)
 }
 
 enum TargetType {
@@ -70,21 +60,6 @@ enum RecommendationType {
   LONG_DESCRIPTION
   LOW_DISCOUNT
   HIGH_DISCOUNT
-}
-
-enum ActionType {
-  INCREASE_PRICE
-  DECREASE_PRICE
-  DEFINE_COST
-  INCREASE_COST
-  DECREASE_COST
-  INCREASE_STOCK
-  DECREASE_STOCK
-  UPDATE_TITLE
-  UPDATE_DESCRIPTION
-  UPLOAD_IMAGE
-  ARCHIVE_PRODUCT
-  NOTIFY_USER
 }
 
 enum RecommendationStatus {
