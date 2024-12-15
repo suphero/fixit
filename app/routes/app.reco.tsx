@@ -1,4 +1,3 @@
-// app/routes/app.reco.tsx
 import {
   Page,
   IndexTable,
@@ -17,6 +16,13 @@ import {
   initializeAllProductVariants,
   findRecommendations,
 } from "../models/reco.server";
+
+type RecommendationData = {
+  count: number;
+  data: Recommendation[];
+};
+
+type LoaderData = Record<string, RecommendationData>;
 
 export async function loader({ request }: any) {
   const url = new URL(request.url);
@@ -57,23 +63,26 @@ export async function action({ request }: any) {
   return loader({ request });
 }
 
+const TAB_DEFINITIONS = [
+  { id: "noImageProducts", content: "No Image" },
+  { id: "shortTitleProducts", content: "Short Title" },
+  { id: "longTitleProducts", content: "Long Title" },
+  { id: "shortDescriptionProducts", content: "Short Desc" },
+  { id: "longDescriptionProducts", content: "Long Desc" },
+  { id: "noStockProducts", content: "No Stock" },
+  { id: "noCostProductVariants", content: "No Cost" },
+];
+
+const PAGE_SIZE = 10;
+
 export default function Index() {
-  const fetcher = useFetcher<Record<string, { count: number; data: Recommendation[] }>>();
-  const data = useLoaderData<Record<string, { count: number; data: Recommendation[] }>>();
+  const fetcher = useFetcher<LoaderData>();
+  const data = useLoaderData<LoaderData>();
   const { mode, setMode } = useSetIndexFiltersMode();
   const [selectedTab, setSelectedTab] = useState(0);
   const [page, setPage] = useState(1);
-  const [size, _setSize] = useState(10);
 
-  const tabs = [
-    { id: "noImageProducts", content: "No Image" },
-    { id: "shortTitleProducts", content: "Short Title" },
-    { id: "longTitleProducts", content: "Long Title" },
-    { id: "shortDescriptionProducts", content: "Short Desc" },
-    { id: "longDescriptionProducts", content: "Long Desc" },
-    { id: "noStockProducts", content: "No Stock" },
-    { id: "noCostProductVariants", content: "No Cost" },
-  ].filter((tab) => data[tab.id].count > 0);
+  const tabs = TAB_DEFINITIONS.filter((tab) => data[tab.id].count > 0);
 
   const recommendations =
     fetcher.data?.[tabs[selectedTab].id]?.data || data[tabs[selectedTab].id].data;
@@ -112,12 +121,12 @@ export default function Index() {
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    fetcher.load(`/app/reco?page=${newPage}&size=${size}`);
+    fetcher.load(`/app/reco?page=${newPage}&size=${PAGE_SIZE}`);
   };
 
   useEffect(() => {
-    fetcher.load(`/app/reco?page=${page}&size=${size}`);
-  }, [page, size]);
+    fetcher.load(`/app/reco?page=${page}&size=${PAGE_SIZE}`);
+  }, [page, PAGE_SIZE]);
 
   return (
     <Page
@@ -156,9 +165,9 @@ export default function Index() {
         pagination={{
           hasPrevious: page > 1,
           onPrevious: () => handlePageChange(page - 1),
-          hasNext: page < Math.ceil(totalCount / size),
+          hasNext: page < Math.ceil(totalCount / PAGE_SIZE),
           onNext: () => handlePageChange(page + 1),
-          label: `${page} of ${Math.ceil(totalCount / size)} page - ${recommendations.length} of ${totalCount} results`,
+          label: `${page} of ${Math.ceil(totalCount / PAGE_SIZE)} page - ${recommendations.length} of ${totalCount} results`,
         }}
       >
         {rowMarkup}
