@@ -16,6 +16,7 @@ import {
   initializeAllProductVariants,
   findRecommendations,
 } from "../models/reco.server";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 
 type RecommendationData = {
   count: number;
@@ -24,13 +25,7 @@ type RecommendationData = {
 
 type LoaderData = Record<string, RecommendationData>;
 
-export async function loader({ request }: any) {
-  const url = new URL(request.url);
-  const page = Number(url.searchParams.get("page") || "1");
-  const size = Number(url.searchParams.get("size") || "10");
-
-  const { session } = await authenticate.admin(request);
-
+async function getAllRecommendations(shop: string, page: number, size: number) {
   const recommendations = await Promise.all(
     [
       RecommendationType.NO_IMAGE,
@@ -41,7 +36,7 @@ export async function loader({ request }: any) {
       RecommendationType.NO_STOCK,
       RecommendationType.NO_COST,
     ].map((type) =>
-      findRecommendations(session.shop, type, page, size)
+      findRecommendations(shop, type, page, size)
     )
   );
 
@@ -56,11 +51,21 @@ export async function loader({ request }: any) {
   });
 }
 
-export async function action({ request }: any) {
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const page = Number(url.searchParams.get("page") || "1");
+  const size = Number(url.searchParams.get("size") || "10");
+
+  const { session } = await authenticate.admin(request);
+
+  return getAllRecommendations(session.shop, page, size);
+}
+
+export async function action({ request }: ActionFunctionArgs) {
   const { admin, session } = await authenticate.admin(request);
   await initializeAllProducts(session.shop, admin.graphql);
   await initializeAllProductVariants(session.shop, admin.graphql);
-  return loader({ request });
+  return getAllRecommendations(session.shop, 1, 10);
 }
 
 const TAB_DEFINITIONS = [
