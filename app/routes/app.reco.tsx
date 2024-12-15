@@ -73,7 +73,7 @@ export default function Index() {
     { id: "longDescriptionProducts", content: "Long Desc" },
     { id: "noStockProducts", content: "No Stock" },
     { id: "noCostProductVariants", content: "No Cost" },
-  ];
+  ].filter((tab) => data[tab.id].count > 0);
 
   const recommendations =
     fetcher.data?.[tabs[selectedTab].id]?.data || data[tabs[selectedTab].id].data;
