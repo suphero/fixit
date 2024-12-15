@@ -58,8 +58,8 @@ export async function action({ request }: any) {
 }
 
 export default function Index() {
-  const fetcher = useFetcher();
-  const data = useLoaderData<Record<string, { count: number; pagedData: Recommendation[] }>>();
+  const fetcher = useFetcher<Record<string, { count: number; data: Recommendation[] }>>();
+  const data = useLoaderData<Record<string, { count: number; data: Recommendation[] }>>();
   const { mode, setMode } = useSetIndexFiltersMode();
   const [selectedTab, setSelectedTab] = useState(0);
   const [page, setPage] = useState(1);
@@ -154,18 +154,12 @@ export default function Index() {
           { title: "Title" },
           { title: "Date Created" },
         ]}
-        emptyState={
-          totalCount === 0 && (
-            <Text variant="bodyMd" as="p">
-              No recommendations found.
-            </Text>
-          )
-        }
         pagination={{
           hasPrevious: page > 1,
           onPrevious: () => handlePageChange(page - 1),
           hasNext: page < Math.ceil(totalCount / size),
           onNext: () => handlePageChange(page + 1),
+          label: `${page} of ${Math.ceil(totalCount / size)}`,
         }}
       >
         {rowMarkup}
