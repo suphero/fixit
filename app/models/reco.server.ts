@@ -159,6 +159,7 @@ export async function initializeAllProductVariants(
                 product {
                   id
                   title
+                  hasOnlyDefaultVariant
                 }
               }
               cursor
@@ -185,12 +186,13 @@ export async function initializeAllProductVariants(
         PRODUCT_VARIANT_RECOMMENDATION_CRITERIA,
       )) {
         if (config.filter(node)) {
+          const title = node.product.hasOnlyDefaultVariant ? node.product.title : `${node.product.title} - ${node.title}`;
           await db.recommendation.create({
             data: {
               shop,
               targetType: TargetType.PRODUCT_VARIANT,
               targetId: node.id,
-              targetTitle: `${node.product.title} - ${node.title}`,
+              targetTitle: title,
               recommendationType: type as RecommendationType,
               status: "PENDING",
               userActionRequired: true,
