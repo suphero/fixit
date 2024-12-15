@@ -2,13 +2,13 @@
 import { json } from "@remix-run/node";
 import {
   Page,
-  Card,
-  Layout,
   IndexTable,
-  Button,
+  IndexFilters,
   Text,
-  InlineGrid,
+  useIndexResourceState,
+  useSetIndexFiltersMode,
 } from "@shopify/polaris";
+import { useState } from "react";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import type { Recommendation } from "@prisma/client";
 import { RecommendationType } from "@prisma/client";
@@ -16,26 +16,30 @@ import { authenticate } from "../shopify.server";
 import {
   initializeAllProducts,
   initializeAllProductVariants,
-  findRecommendations
+  findRecommendations,
 } from "../models/reco.server";
 
 export async function loader({ request }: any) {
   const { session } = await authenticate.admin(request);
-  const noImageProducts = await findRecommendations(session.shop, RecommendationType.NO_IMAGE);
-  const shortTitleProducts = await findRecommendations(session.shop, RecommendationType.SHORT_TITLE);
-  const longTitleProducts = await findRecommendations(session.shop, RecommendationType.LONG_TITLE);
-  const shortDescriptionProducts = await findRecommendations(session.shop, RecommendationType.SHORT_DESCRIPTION);
-  const longDescriptionProducts = await findRecommendations(session.shop, RecommendationType.LONG_DESCRIPTION);
-  const noStockProducts = await findRecommendations(session.shop, RecommendationType.NO_STOCK);
-  const noCostProductVariants = await findRecommendations(session.shop, RecommendationType.NO_COST);
+
+  const recommendations = await Promise.all([
+    findRecommendations(session.shop, RecommendationType.NO_IMAGE),
+    findRecommendations(session.shop, RecommendationType.SHORT_TITLE),
+    findRecommendations(session.shop, RecommendationType.LONG_TITLE),
+    findRecommendations(session.shop, RecommendationType.SHORT_DESCRIPTION),
+    findRecommendations(session.shop, RecommendationType.LONG_DESCRIPTION),
+    findRecommendations(session.shop, RecommendationType.NO_STOCK),
+    findRecommendations(session.shop, RecommendationType.NO_COST),
+  ]);
+
   return json({
-    noImageProducts,
-    shortTitleProducts,
-    longTitleProducts,
-    shortDescriptionProducts,
-    longDescriptionProducts,
-    noStockProducts,
-    noCostProductVariants
+    noImageProducts: recommendations[0],
+    shortTitleProducts: recommendations[1],
+    longTitleProducts: recommendations[2],
+    shortDescriptionProducts: recommendations[3],
+    longDescriptionProducts: recommendations[4],
+    noStockProducts: recommendations[5],
+    noCostProductVariants: recommendations[6],
   });
 }
 
@@ -43,160 +47,92 @@ export async function action({ request }: any) {
   const { admin, session } = await authenticate.admin(request);
   await initializeAllProducts(session.shop, admin.graphql);
   await initializeAllProductVariants(session.shop, admin.graphql);
-
-  const noImageProducts = await findRecommendations(session.shop, RecommendationType.NO_IMAGE);
-  const shortTitleProducts = await findRecommendations(session.shop, RecommendationType.SHORT_TITLE);
-  const longTitleProducts = await findRecommendations(session.shop, RecommendationType.LONG_TITLE);
-  const shortDescriptionProducts = await findRecommendations(session.shop, RecommendationType.SHORT_DESCRIPTION);
-  const longDescriptionProducts = await findRecommendations(session.shop, RecommendationType.LONG_DESCRIPTION);
-  const noStockProducts = await findRecommendations(session.shop, RecommendationType.NO_STOCK);
-  const noCostProductVariants = await findRecommendations(session.shop, RecommendationType.NO_COST);
-
-  return json({
-    noImageProducts,
-    shortTitleProducts,
-    longTitleProducts,
-    shortDescriptionProducts,
-    longDescriptionProducts,
-    noStockProducts,
-    noCostProductVariants
-  });
+  const recommendations = await loader({ request });
+  return recommendations;
 }
-
-function truncate(str: string, { length = 50 } = {}) {
-  return str?.length > length ? str.slice(0, length) + "…" : str || "";
-}
-
-const RecommendationTable = ({ recommendations }: { recommendations: Recommendation[] }) => (
-  <IndexTable
-    resourceName={{
-      singular: "Recommendation",
-      plural: "Recommendations",
-    }}
-    itemCount={recommendations.length}
-    headings={[
-      { title: "Title" },
-      { title: "Date created" },
-    ]}
-    selectable={false}
-  >
-    {recommendations.map((recommendation) => (
-      <RecommendationRow key={recommendation.id} recommendation={recommendation} />
-    ))}
-  </IndexTable>
-);
-
-// Reusable Table Row Component
-const RecommendationRow = ({
-  recommendation,
-}: {
-  recommendation: Recommendation;
-}) => (
-  <IndexTable.Row id={recommendation.id} position={recommendation.id}>
-    <IndexTable.Cell>
-      <Text as={"h2"}>{truncate(recommendation.targetTitle)}</Text>
-    </IndexTable.Cell>
-    <IndexTable.Cell>
-      {new Date(recommendation.createdAt).toDateString()}
-    </IndexTable.Cell>
-  </IndexTable.Row>
-);
 
 export default function Index() {
   const data = useLoaderData<Record<string, Recommendation[]>>();
   const fetcher = useFetcher<Record<string, Recommendation[]>>();
+  const {mode, setMode} = useSetIndexFiltersMode();
 
-  const handleInitialize = () => {
-    fetcher.submit(null, { method: "post" });
-  };
+  const [selectedTab, setSelectedTab] = useState(0);
+
+  const tabs = [
+    { id: "noImageProducts", content: "No Image" },
+    { id: "shortTitleProducts", content: "Short Title" },
+    { id: "longTitleProducts", content: "Long Title" },
+    { id: "shortDescriptionProducts", content: "Short Desc" },
+    { id: "longDescriptionProducts", content: "Long Desc" },
+    { id: "noStockProducts", content: "No Stock" },
+    { id: "noCostProductVariants", content: "No Cost" },
+  ];
+
+  const recommendations = fetcher.data?.[tabs[selectedTab].id] || data[tabs[selectedTab].id];
+  const resourceName = { singular: "Recommendation", plural: "Recommendations" };
+
+  const { selectedResources, allResourcesSelected, handleSelectionChange } =
+    useIndexResourceState(recommendations);
+
+  const truncate = (str: string, length = 50) =>
+    str?.length > length ? str.slice(0, length) + "…" : str || "";
+
+  const rowMarkup = recommendations.map((recommendation, index) => (
+    <IndexTable.Row
+      id={recommendation.id}
+      key={recommendation.id}
+      selected={selectedResources.includes(recommendation.id)}
+      position={index}
+    >
+      <IndexTable.Cell>
+        <Text variant="bodyMd" fontWeight="semibold" as="h2">
+          {truncate(recommendation.targetTitle)}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        {new Date(recommendation.createdAt).toDateString()}
+      </IndexTable.Cell>
+    </IndexTable.Row>
+  ));
 
   return (
     <Page
       title="Recommendations"
-      primaryAction={
-        <Button
-          variant="primary"
-          onClick={() => handleInitialize()}
-          loading={fetcher.state === "submitting"}
-          accessibilityLabel="Initialize">
-            Initialize
-        </Button>
-      }
+      primaryAction={{
+        content: "Initialize",
+        onAction: () => fetcher.submit(null, { method: "post" }),
+        loading: fetcher.state === "submitting",
+      }}
     >
-      <Layout>
-        <Layout.Section>
-          <Card roundedAbove="sm">
-            <InlineGrid columns="1fr auto">
-              <Text as="h2" variant="headingSm">
-                No Image Products
-              </Text>
-            </InlineGrid>
-            <RecommendationTable
-              recommendations={fetcher.data?.noImageProducts || data.noImageProducts}
-            />
-          </Card>
-          <Card roundedAbove="sm">
-            <InlineGrid columns="1fr auto">
-              <Text as="h2" variant="headingSm">
-                Short Title Products
-              </Text>
-            </InlineGrid>
-            <RecommendationTable
-              recommendations={fetcher.data?.shortTitleProducts || data.shortTitleProducts}
-            />
-          </Card>
-          <Card roundedAbove="sm">
-            <InlineGrid columns="1fr auto">
-              <Text as="h2" variant="headingSm">
-                Long Title Products
-              </Text>
-            </InlineGrid>
-            <RecommendationTable
-              recommendations={fetcher.data?.longTitleProducts || data.longTitleProducts}
-            />
-          </Card>
-          <Card roundedAbove="sm">
-            <InlineGrid columns="1fr auto">
-              <Text as="h2" variant="headingSm">
-                Short Description Products
-              </Text>
-            </InlineGrid>
-            <RecommendationTable
-              recommendations={fetcher.data?.shortDescriptionProducts || data.shortDescriptionProducts}
-            />
-          </Card>
-          <Card roundedAbove="sm">
-            <InlineGrid columns="1fr auto">
-              <Text as="h2" variant="headingSm">
-                Long Description Products
-              </Text>
-            </InlineGrid>
-            <RecommendationTable
-              recommendations={fetcher.data?.longDescriptionProducts || data.longDescriptionProducts}
-            />
-          </Card>
-          <Card roundedAbove="sm">
-            <InlineGrid columns="1fr auto">
-              <Text as="h2" variant="headingSm">
-                No Stock Products
-              </Text>
-            </InlineGrid>
-            <RecommendationTable
-              recommendations={fetcher.data?.noStockProducts || data.noStockProducts}
-            />
-          </Card>
-          <Card roundedAbove="sm">
-            <InlineGrid columns="1fr auto">
-              <Text as="h2" variant="headingSm">
-                No Cost Product Variants
-              </Text>
-            </InlineGrid>
-            <RecommendationTable
-              recommendations={fetcher.data?.noCostProductVariants || data.noCostProductVariants}
-            />
-          </Card>
-        </Layout.Section>
-      </Layout>
+      <IndexFilters
+        tabs={tabs}
+        selected={selectedTab}
+        onSelect={setSelectedTab}
+        mode={mode}
+        setMode={setMode}
+        filters={[]}
+        appliedFilters={[]}
+        onQueryChange={() => {}}
+        onQueryClear={() => {}}
+        onClearAll={() => {}}
+        canCreateNewView={false}
+        hideFilters
+        hideQueryField
+      />
+      <IndexTable
+        resourceName={resourceName}
+        itemCount={recommendations.count}
+        selectedItemsCount={
+          allResourcesSelected ? "All" : selectedResources.length
+        }
+        onSelectionChange={handleSelectionChange}
+        headings={[
+          { title: "Title" },
+          { title: "Date Created" },
+        ]}
+      >
+        {rowMarkup}
+      </IndexTable>
     </Page>
   );
 }
