@@ -217,8 +217,8 @@ export async function initializeAllProductVariants(
 export async function findRecommendations(
   shop: string,
   recommendationType: RecommendationType,
-  page: number = 1,
-  size: number = 10,
+  page: number,
+  size: number,
 ) {
   const skip = (page - 1) * size;
   const take = size;

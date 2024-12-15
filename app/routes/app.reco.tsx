@@ -8,10 +8,9 @@ import {
   useIndexResourceState,
   useSetIndexFiltersMode,
 } from "@shopify/polaris";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import type { Recommendation } from "@prisma/client";
-import { RecommendationType } from "@prisma/client";
+import { RecommendationType, type Recommendation } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import {
   initializeAllProducts,
@@ -20,17 +19,25 @@ import {
 } from "../models/reco.server";
 
 export async function loader({ request }: any) {
+  const url = new URL(request.url);
+  const page = Number(url.searchParams.get("page") || "1");
+  const size = Number(url.searchParams.get("size") || "10");
+
   const { session } = await authenticate.admin(request);
 
-  const recommendations = await Promise.all([
-    findRecommendations(session.shop, RecommendationType.NO_IMAGE),
-    findRecommendations(session.shop, RecommendationType.SHORT_TITLE),
-    findRecommendations(session.shop, RecommendationType.LONG_TITLE),
-    findRecommendations(session.shop, RecommendationType.SHORT_DESCRIPTION),
-    findRecommendations(session.shop, RecommendationType.LONG_DESCRIPTION),
-    findRecommendations(session.shop, RecommendationType.NO_STOCK),
-    findRecommendations(session.shop, RecommendationType.NO_COST),
-  ]);
+  const recommendations = await Promise.all(
+    [
+      RecommendationType.NO_IMAGE,
+      RecommendationType.SHORT_TITLE,
+      RecommendationType.LONG_TITLE,
+      RecommendationType.SHORT_DESCRIPTION,
+      RecommendationType.LONG_DESCRIPTION,
+      RecommendationType.NO_STOCK,
+      RecommendationType.NO_COST,
+    ].map((type) =>
+      findRecommendations(session.shop, type, page, size)
+    )
+  );
 
   return json({
     noImageProducts: recommendations[0],
@@ -47,16 +54,16 @@ export async function action({ request }: any) {
   const { admin, session } = await authenticate.admin(request);
   await initializeAllProducts(session.shop, admin.graphql);
   await initializeAllProductVariants(session.shop, admin.graphql);
-  const recommendations = await loader({ request });
-  return recommendations;
+  return loader({ request });
 }
 
 export default function Index() {
-  const data = useLoaderData<Record<string, Recommendation[]>>();
-  const fetcher = useFetcher<Record<string, Recommendation[]>>();
-  const {mode, setMode} = useSetIndexFiltersMode();
-
+  const fetcher = useFetcher();
+  const data = useLoaderData<Record<string, { count: number; pagedData: Recommendation[] }>>();
+  const { mode, setMode } = useSetIndexFiltersMode();
   const [selectedTab, setSelectedTab] = useState(0);
+  const [page, setPage] = useState(1);
+  const [size, _setSize] = useState(10);
 
   const tabs = [
     { id: "noImageProducts", content: "No Image" },
@@ -68,8 +75,16 @@ export default function Index() {
     { id: "noCostProductVariants", content: "No Cost" },
   ];
 
-  const recommendations = fetcher.data?.[tabs[selectedTab].id] || data[tabs[selectedTab].id];
-  const resourceName = { singular: "Recommendation", plural: "Recommendations" };
+  const recommendations =
+    fetcher.data?.[tabs[selectedTab].id]?.data || data[tabs[selectedTab].id].data;
+
+  const totalCount =
+    fetcher.data?.[tabs[selectedTab].id]?.count || data[tabs[selectedTab].id].count;
+
+  const resourceName = {
+    singular: "Recommendation",
+    plural: "Recommendations",
+  };
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(recommendations);
@@ -94,6 +109,15 @@ export default function Index() {
       </IndexTable.Cell>
     </IndexTable.Row>
   ));
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    fetcher.load(`/app/reco?page=${newPage}&size=${size}`);
+  };
+
+  useEffect(() => {
+    fetcher.load(`/app/reco?page=${page}&size=${size}`);
+  }, [page, size]);
 
   return (
     <Page
@@ -121,7 +145,7 @@ export default function Index() {
       />
       <IndexTable
         resourceName={resourceName}
-        itemCount={recommendations.count}
+        itemCount={totalCount}
         selectedItemsCount={
           allResourcesSelected ? "All" : selectedResources.length
         }
@@ -130,6 +154,19 @@ export default function Index() {
           { title: "Title" },
           { title: "Date Created" },
         ]}
+        emptyState={
+          totalCount === 0 && (
+            <Text variant="bodyMd" as="p">
+              No recommendations found.
+            </Text>
+          )
+        }
+        pagination={{
+          hasPrevious: page > 1,
+          onPrevious: () => handlePageChange(page - 1),
+          hasNext: page < Math.ceil(totalCount / size),
+          onNext: () => handlePageChange(page + 1),
+        }}
       >
         {rowMarkup}
       </IndexTable>
