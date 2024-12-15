@@ -158,7 +158,7 @@ export default function Index() {
           onPrevious: () => handlePageChange(page - 1),
           hasNext: page < Math.ceil(totalCount / size),
           onNext: () => handlePageChange(page + 1),
-          label: `${page} of ${Math.ceil(totalCount / size)}`,
+          label: `${page} of ${Math.ceil(totalCount / size)} page - ${recommendations.length} of ${totalCount} results`,
         }}
       >
         {rowMarkup}
