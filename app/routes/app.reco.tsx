@@ -124,6 +124,12 @@ export default function Index() {
     </IndexTable.Row>
   ));
 
+  const handleTabChange = (selectedTabIndex: number) => {
+    setSelectedTab(selectedTabIndex);
+    setPage(1);
+    fetcher.load(`/app/reco?page=1&size=${PAGE_SIZE}`);
+  };
+
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
     fetcher.load(`/app/reco?page=${newPage}&size=${PAGE_SIZE}`);
@@ -145,7 +151,7 @@ export default function Index() {
       <IndexFilters
         tabs={tabs}
         selected={selectedTab}
-        onSelect={setSelectedTab}
+        onSelect={handleTabChange}
         mode={mode}
         setMode={setMode}
         filters={[]}
