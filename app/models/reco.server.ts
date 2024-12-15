@@ -14,34 +14,27 @@ import db from "../db.server";
 const PRODUCT_RECOMMENDATION_CRITERIA = {
   NO_IMAGE: {
     filter: (node: any) => node.featuredMedia === null,
-    suggestedValue: "Upload an image for this product",
   },
   SHORT_TITLE: {
     filter: (node: any) => node.title.length < 10,
-    suggestedValue: "Consider using a more descriptive title",
   },
   LONG_TITLE: {
     filter: (node: any) => node.title.length > 50,
-    suggestedValue: "Consider using a shorter title",
   },
   SHORT_DESCRIPTION: {
     filter: (node: any) => node.description.length < 100,
-    suggestedValue: "Consider using a more descriptive description",
   },
   LONG_DESCRIPTION: {
     filter: (node: any) => node.description.length > 1000,
-    suggestedValue: "Consider using a shorter description",
   },
   NO_STOCK: {
     filter: (node: any) => node.totalInventory === 0,
-    suggestedValue: "Define a cost for this product variant",
   },
 };
 
 const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
   NO_COST: {
     filter: (node: any) => node?.inventoryItem?.unitCost === null,
-    suggestedValue: "Add a cost to this variant",
   },
 };
 
