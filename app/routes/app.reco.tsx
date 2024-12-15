@@ -135,7 +135,6 @@ export default function Index() {
         mode={mode}
         setMode={setMode}
         filters={[]}
-        appliedFilters={[]}
         onQueryChange={() => {}}
         onQueryClear={() => {}}
         onClearAll={() => {}}

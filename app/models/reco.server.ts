@@ -108,7 +108,7 @@ export async function initializeAllProducts(
               targetType: TargetType.PRODUCT,
               targetId: node.id,
               targetTitle: node.title,
-              recommendationType: type,
+              recommendationType: type as RecommendationType,
               status: "PENDING",
               userActionRequired: true,
               actions: {
@@ -191,7 +191,7 @@ export async function initializeAllProductVariants(
               targetType: TargetType.PRODUCT_VARIANT,
               targetId: node.id,
               targetTitle: `${node.product.title} - ${node.title}`,
-              recommendationType: type,
+              recommendationType: type as RecommendationType,
               status: "PENDING",
               userActionRequired: true,
               actions: {
