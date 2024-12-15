@@ -1,5 +1,4 @@
 // app/routes/app.reco.tsx
-import { json } from "@remix-run/node";
 import {
   Page,
   IndexTable,
@@ -7,6 +6,7 @@ import {
   Text,
   useIndexResourceState,
   useSetIndexFiltersMode,
+  INDEX_TABLE_SELECT_ALL_ITEMS,
 } from "@shopify/polaris";
 import { useState, useEffect } from "react";
 import { useLoaderData, useFetcher } from "@remix-run/react";
@@ -39,7 +39,7 @@ export async function loader({ request }: any) {
     )
   );
 
-  return json({
+  return Response.json({
     noImageProducts: recommendations[0],
     shortTitleProducts: recommendations[1],
     longTitleProducts: recommendations[2],
@@ -147,7 +147,7 @@ export default function Index() {
         resourceName={resourceName}
         itemCount={totalCount}
         selectedItemsCount={
-          allResourcesSelected ? "All" : selectedResources.length
+          allResourcesSelected ? INDEX_TABLE_SELECT_ALL_ITEMS : selectedResources.length
         }
         onSelectionChange={handleSelectionChange}
         headings={[
