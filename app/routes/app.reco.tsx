@@ -118,6 +118,8 @@ export default function Index() {
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(recommendations);
 
+  const isLoading = fetcher.state !== "idle";
+
   if (tabs.length === 0) {
     return (
       <Page
@@ -202,6 +204,7 @@ export default function Index() {
         canCreateNewView={false}
         hideFilters
         hideQueryField
+        loading={isLoading}
       />
       <IndexTable
         resourceName={resourceName}
@@ -214,6 +217,7 @@ export default function Index() {
           { title: "Title" },
           { title: "Date Created" },
         ]}
+        loading={isLoading}
         pagination={{
           hasPrevious: page > 1,
           onPrevious: () => handlePageChange(page - 1),
