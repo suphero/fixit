@@ -182,7 +182,16 @@ export async function initializeAllProductVariants(
   }
 }
 
-export async function findRecommendations(
+export async function getRecommendationCount(
+  shop: string,
+  recommendationType: RecommendationType,
+) {
+  return prisma.recommendation.count({
+    where: { shop, recommendationType },
+  });
+}
+
+export async function getRecommendationList(
   shop: string,
   recommendationType: RecommendationType,
   page: number,
@@ -191,20 +200,10 @@ export async function findRecommendations(
   const skip = (page - 1) * size;
   const take = size;
 
-  const [count, data] = await prisma.$transaction([
-    prisma.recommendation.count({
-      where: { shop, recommendationType },
-    }),
-    prisma.recommendation.findMany({
-      where: { shop, recommendationType },
-      skip,
-      take,
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
-
-  return {
-    count,
-    data,
-  };
+  return prisma.recommendation.findMany({
+    where: { shop, recommendationType },
+    skip,
+    take,
+    orderBy: { createdAt: "desc" },
+  });
 }

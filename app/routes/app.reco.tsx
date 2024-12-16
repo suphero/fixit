@@ -16,19 +16,24 @@ import { authenticate } from "../shopify.server";
 import {
   initializeAllProducts,
   initializeAllProductVariants,
-  findRecommendations,
+  getRecommendationCount,
+  getRecommendationList,
 } from "../models/reco.server";
 import { getShopifyAdminUrl } from "../utils/url";
 
-type RecommendationData = {
-  count: number;
-  data: Recommendation[];
+type RecommendationCount = Record<string, number>;
+type LoaderData = {
+  shop: string;
+  counts: RecommendationCount;
+  activeTab?: {
+    id: string;
+    data: Recommendation[];
+    count: number;
+  }
 };
 
-type LoaderData = { shop: string; data: Record<string, RecommendationData> };
-
-async function getAllRecommendations(shop: string, page: number, size: number) {
-  const recommendations = await Promise.all(
+async function getAllCounts(shop: string) {
+  const counts = await Promise.all(
     [
       RecommendationType.NO_IMAGE,
       RecommendationType.SHORT_TITLE,
@@ -37,49 +42,56 @@ async function getAllRecommendations(shop: string, page: number, size: number) {
       RecommendationType.LONG_DESCRIPTION,
       RecommendationType.NO_STOCK,
       RecommendationType.NO_COST,
-    ].map((type) =>
-      findRecommendations(shop, type, page, size)
-    )
+    ].map(async (type) => {
+      const count = await getRecommendationCount(shop, type);
+      return [TAB_DEFINITIONS.find(tab => tab.type === type)?.id ?? '', count] as const;
+    })
   );
 
-  return {
-    noImageProducts: recommendations[0],
-    shortTitleProducts: recommendations[1],
-    longTitleProducts: recommendations[2],
-    shortDescriptionProducts: recommendations[3],
-    longDescriptionProducts: recommendations[4],
-    noStockProducts: recommendations[5],
-    noCostProductVariants: recommendations[6],
-  };
+  return Object.fromEntries(counts);
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const page = Number(url.searchParams.get("page") ?? "1");
   const size = Number(url.searchParams.get("size") ?? "10");
+  const tabId = url.searchParams.get("tab");
 
   const { session } = await authenticate.admin(request);
-  const data = await getAllRecommendations(session.shop, page, size);
+  const counts = await getAllCounts(session.shop);
 
-  return { shop: session.shop, data };
+  let activeTab;
+  if (tabId) {
+    const type = TAB_DEFINITIONS.find(tab => tab.id === tabId)?.type;
+    if (type) {
+      const [count, data] = await Promise.all([
+        getRecommendationCount(session.shop, type),
+        getRecommendationList(session.shop, type, page, size),
+      ]);
+      activeTab = { id: tabId, count, data };
+    }
+  }
+
+  return { shop: session.shop, counts, activeTab };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
   const { admin, session } = await authenticate.admin(request);
   await initializeAllProducts(session.shop, admin.graphql);
   await initializeAllProductVariants(session.shop, admin.graphql);
-  const data = await getAllRecommendations(session.shop, 1, 10);
-  return { shop: session.shop, data };
+
+  const counts = await getAllCounts(session.shop);
+  return { shop: session.shop, counts };
 }
 
 const TAB_DEFINITIONS = [
-  { id: "noImageProducts", content: "No Image" },
-  { id: "shortTitleProducts", content: "Short Title" },
-  { id: "longTitleProducts", content: "Long Title" },
-  { id: "shortDescriptionProducts", content: "Short Desc" },
-  { id: "longDescriptionProducts", content: "Long Desc" },
-  { id: "noStockProducts", content: "No Stock" },
-  { id: "noCostProductVariants", content: "No Cost" },
+  { id: "noImageProducts", content: "No Image", type: RecommendationType.NO_IMAGE },
+  { id: "shortTitleProducts", content: "Short Title", type: RecommendationType.SHORT_TITLE },
+  { id: "longTitleProducts", content: "Long Title", type: RecommendationType.LONG_TITLE },
+  { id: "shortDescriptionProducts", content: "Short Desc", type: RecommendationType.SHORT_DESCRIPTION },
+  { id: "longDescriptionProducts", content: "Long Desc", type: RecommendationType.LONG_DESCRIPTION },
+  { id: "noStockProducts", content: "No Stock", type: RecommendationType.NO_STOCK },
+  { id: "noCostProductVariants", content: "No Cost", type: RecommendationType.NO_COST },
 ];
 
 const PAGE_SIZE = 10;
@@ -91,18 +103,17 @@ export default function Index() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [page, setPage] = useState(1);
 
+  const tabs = TAB_DEFINITIONS.filter((tab) => data.counts[tab.id] > 0);
+
   useEffect(() => {
-    fetcher.load(`/app/reco?page=${page}&size=${PAGE_SIZE}`);
-  }, [page, PAGE_SIZE]);
+    if (tabs.length > 0) {
+      fetcher.load(`/app/reco?tab=${tabs[selectedTab].id}&page=${page}&size=${PAGE_SIZE}`);
+    }
+  }, [selectedTab, page]);
 
-  const recommendationsData = data?.data || {};
-  const tabs = TAB_DEFINITIONS.filter((tab) =>
-    recommendationsData[tab.id]?.count > 0
-  );
-
-  const recommendations = tabs.length > 0
-    ? (fetcher.data?.data?.[tabs[selectedTab].id]?.data || recommendationsData[tabs[selectedTab].id]?.data)
-    : [];
+  const activeTabData = fetcher.data?.activeTab ?? data.activeTab;
+  const recommendations = activeTabData?.data ?? [];
+  const totalCount = activeTabData?.count ?? 0;
 
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(recommendations);
@@ -121,9 +132,6 @@ export default function Index() {
       </Page>
     );
   }
-
-  const totalCount =
-    fetcher.data?.data?.[tabs[selectedTab].id]?.count ?? data.data[tabs[selectedTab].id].count;
 
   const shop = fetcher.data?.shop ?? data.shop;
 
@@ -164,12 +172,12 @@ export default function Index() {
   const handleTabChange = (selectedTabIndex: number) => {
     setSelectedTab(selectedTabIndex);
     setPage(1);
-    fetcher.load(`/app/reco?page=1&size=${PAGE_SIZE}`);
+    fetcher.load(`/app/reco?tab=${tabs[selectedTabIndex].id}&page=1&size=${PAGE_SIZE}`);
   };
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    fetcher.load(`/app/reco?page=${newPage}&size=${PAGE_SIZE}`);
+    fetcher.load(`/app/reco?tab=${tabs[selectedTab].id}&page=${newPage}&size=${PAGE_SIZE}`);
   };
 
   return (
