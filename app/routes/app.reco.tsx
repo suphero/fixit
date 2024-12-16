@@ -44,6 +44,9 @@ async function getAllCounts(shop: string) {
       RecommendationType.NO_COST,
       RecommendationType.CHEAP,
       RecommendationType.EXPENSIVE,
+      RecommendationType.LOW_DISCOUNT,
+      RecommendationType.HIGH_DISCOUNT,
+      RecommendationType.SALE_AT_LOSS,
     ].map(async (type) => {
       const count = await getRecommendationCount(shop, type);
       return [TAB_DEFINITIONS.find(tab => tab.type === type)?.id ?? '', count] as const;
@@ -94,8 +97,11 @@ const TAB_DEFINITIONS = [
   { id: "longDescriptionProducts", content: "Long Desc", type: RecommendationType.LONG_DESCRIPTION },
   { id: "noStockProducts", content: "No Stock", type: RecommendationType.NO_STOCK },
   { id: "noCostProductVariants", content: "No Cost", type: RecommendationType.NO_COST },
+  { id: "saleAtLossProductVariants", content: "Sale at Loss", type: RecommendationType.SALE_AT_LOSS },
   { id: "cheapProductVariants", content: "Cheap", type: RecommendationType.CHEAP },
   { id: "expensiveProductVariants", content: "Expensive", type: RecommendationType.EXPENSIVE },
+  { id: "lowDiscountProductVariants", content: "Low Discount", type: RecommendationType.LOW_DISCOUNT },
+  { id: "highDiscountProductVariants", content: "High Discount", type: RecommendationType.HIGH_DISCOUNT },
 ];
 
 const PAGE_SIZE = 10;

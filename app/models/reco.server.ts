@@ -16,9 +16,10 @@ import { getProductUrlFromGid, getProductVariantUrlFromGid } from "../utils/url.
 type ProductVariantNode = {
   id: string;
   title: string;
-  price: { amount: string; currencyCode: string };
+  price: string;
+  compareAtPrice: string | null;
   inventoryItem: {
-    unitCost: { amount: string; currencyCode: string } | null;
+    unitCost: { amount: string; } | null;
   };
   product: {
     id: string;
@@ -61,14 +62,23 @@ const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
   NO_COST: {
     filter: (node: ProductVariantNode) => node.inventoryItem?.unitCost === null,
   },
+  SALE_AT_LOSS: {
+    filter: (node: ProductVariantNode) => {
+      const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
+      const price = Number(node.price ?? 0);
+      if (cost === 0 || price === 0) return false;
+
+      return price < cost;
+    },
+  },
   CHEAP: {
     filter: (node: ProductVariantNode) => {
       const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
       const price = Number(node.price ?? 0);
       if (cost === 0 || price === 0) return false;
 
-      const minimumPrice = cost * 1.2; // 20% profit margin
-      return price < minimumPrice;
+      // Price should be above cost but below 20% profit margin
+      return price >= cost && price < (cost * 1.2);
     },
   },
   EXPENSIVE: {
@@ -79,6 +89,26 @@ const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
 
       const maximumPrice = cost * 1.8; // 80% profit margin
       return price > maximumPrice;
+    },
+  },
+  LOW_DISCOUNT: {
+    filter: (node: ProductVariantNode) => {
+      const price = Number(node.price ?? 0);
+      const compareAtPrice = Number(node.compareAtPrice ?? 0);
+      if (compareAtPrice === 0) return false;
+
+      const discountPercentage = ((compareAtPrice - price) / compareAtPrice) * 100;
+      return discountPercentage > 0 && discountPercentage < 10;
+    },
+  },
+  HIGH_DISCOUNT: {
+    filter: (node: ProductVariantNode) => {
+      const price = Number(node.price ?? 0);
+      const compareAtPrice = Number(node.compareAtPrice ?? 0);
+      if (compareAtPrice === 0) return false;
+
+      const discountPercentage = ((compareAtPrice - price) / compareAtPrice) * 100;
+      return discountPercentage > 90;
     },
   },
 };
@@ -172,6 +202,7 @@ export async function initializeAllProductVariants(
                 id
                 title
                 price
+                compareAtPrice
                 inventoryItem {
                   unitCost {
                     amount
