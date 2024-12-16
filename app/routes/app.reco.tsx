@@ -6,8 +6,10 @@ import {
   useIndexResourceState,
   useSetIndexFiltersMode,
   INDEX_TABLE_SELECT_ALL_ITEMS,
+  Link,
 } from "@shopify/polaris";
 import { useState, useEffect } from "react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import { RecommendationType, type Recommendation } from "@prisma/client";
 import { authenticate } from "../shopify.server";
@@ -16,14 +18,14 @@ import {
   initializeAllProductVariants,
   findRecommendations,
 } from "../models/reco.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { getShopifyAdminUrl } from "../utils/url";
 
 type RecommendationData = {
   count: number;
   data: Recommendation[];
 };
 
-type LoaderData = Record<string, RecommendationData>;
+type LoaderData = { shop: string; data: Record<string, RecommendationData> };
 
 async function getAllRecommendations(shop: string, page: number, size: number) {
   const recommendations = await Promise.all(
@@ -40,7 +42,7 @@ async function getAllRecommendations(shop: string, page: number, size: number) {
     )
   );
 
-  return Response.json({
+  return {
     noImageProducts: recommendations[0],
     shortTitleProducts: recommendations[1],
     longTitleProducts: recommendations[2],
@@ -48,24 +50,26 @@ async function getAllRecommendations(shop: string, page: number, size: number) {
     longDescriptionProducts: recommendations[4],
     noStockProducts: recommendations[5],
     noCostProductVariants: recommendations[6],
-  });
+  };
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
-  const page = Number(url.searchParams.get("page") || "1");
-  const size = Number(url.searchParams.get("size") || "10");
+  const page = Number(url.searchParams.get("page") ?? "1");
+  const size = Number(url.searchParams.get("size") ?? "10");
 
   const { session } = await authenticate.admin(request);
+  const data = await getAllRecommendations(session.shop, page, size);
 
-  return getAllRecommendations(session.shop, page, size);
+  return { shop: session.shop, data };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
   const { admin, session } = await authenticate.admin(request);
   await initializeAllProducts(session.shop, admin.graphql);
   await initializeAllProductVariants(session.shop, admin.graphql);
-  return getAllRecommendations(session.shop, 1, 10);
+  const data = await getAllRecommendations(session.shop, 1, 10);
+  return { shop: session.shop, data };
 }
 
 const TAB_DEFINITIONS = [
@@ -87,42 +91,75 @@ export default function Index() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [page, setPage] = useState(1);
 
-  const tabs = TAB_DEFINITIONS.filter((tab) => data[tab.id].count > 0);
+  useEffect(() => {
+    fetcher.load(`/app/reco?page=${page}&size=${PAGE_SIZE}`);
+  }, [page, PAGE_SIZE]);
 
-  const recommendations =
-    fetcher.data?.[tabs[selectedTab].id]?.data || data[tabs[selectedTab].id].data;
+  const recommendationsData = data?.data || {};
+  const tabs = TAB_DEFINITIONS.filter((tab) =>
+    recommendationsData[tab.id]?.count > 0
+  );
+
+  const recommendations = tabs.length > 0
+    ? (fetcher.data?.data?.[tabs[selectedTab].id]?.data || recommendationsData[tabs[selectedTab].id]?.data)
+    : [];
+
+  const { selectedResources, allResourcesSelected, handleSelectionChange } =
+    useIndexResourceState(recommendations);
+
+  if (tabs.length === 0) {
+    return (
+      <Page
+        title="Recommendations"
+        primaryAction={{
+          content: "Initialize",
+          onAction: () => fetcher.submit(null, { method: "post" }),
+          loading: fetcher.state === "submitting",
+        }}
+      >
+        <Text as="span">There are no recommendations to show.</Text>
+      </Page>
+    );
+  }
 
   const totalCount =
-    fetcher.data?.[tabs[selectedTab].id]?.count || data[tabs[selectedTab].id].count;
+    fetcher.data?.data?.[tabs[selectedTab].id]?.count ?? data.data[tabs[selectedTab].id].count;
+
+  const shop = fetcher.data?.shop ?? data.shop;
 
   const resourceName = {
     singular: "Recommendation",
     plural: "Recommendations",
   };
 
-  const { selectedResources, allResourcesSelected, handleSelectionChange } =
-    useIndexResourceState(recommendations);
-
   const truncate = (str: string, length = 50) =>
     str?.length > length ? str.slice(0, length) + "…" : str || "";
 
-  const rowMarkup = recommendations.map((recommendation, index) => (
-    <IndexTable.Row
-      id={recommendation.id}
-      key={recommendation.id}
-      selected={selectedResources.includes(recommendation.id)}
-      position={index}
-    >
-      <IndexTable.Cell>
-        <Text variant="bodyMd" fontWeight="semibold" as="h2">
-          {truncate(recommendation.targetTitle)}
-        </Text>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        {new Date(recommendation.createdAt).toDateString()}
-      </IndexTable.Cell>
-    </IndexTable.Row>
-  ));
+  const rowMarkup = recommendations.map((recommendation, index) => {
+    return (
+      <IndexTable.Row
+        id={recommendation.id}
+        key={recommendation.id}
+        selected={selectedResources.includes(recommendation.id)}
+        position={index}
+      >
+        <IndexTable.Cell>
+          <Link
+            dataPrimaryLink
+            url={getShopifyAdminUrl(shop, recommendation.targetUrl)}
+            target="_blank"
+          >
+            <Text fontWeight="bold" as="span">
+              {truncate(recommendation.targetTitle)}
+            </Text>
+          </Link>
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          {new Date(recommendation.createdAt).toLocaleDateString()}
+        </IndexTable.Cell>
+      </IndexTable.Row>
+    );
+  });
 
   const handleTabChange = (selectedTabIndex: number) => {
     setSelectedTab(selectedTabIndex);
@@ -134,10 +171,6 @@ export default function Index() {
     setPage(newPage);
     fetcher.load(`/app/reco?page=${newPage}&size=${PAGE_SIZE}`);
   };
-
-  useEffect(() => {
-    fetcher.load(`/app/reco?page=${page}&size=${PAGE_SIZE}`);
-  }, [page, PAGE_SIZE]);
 
   return (
     <Page

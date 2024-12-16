@@ -2,6 +2,7 @@ import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 import type { RecommendationType } from "@prisma/client";
 import { TargetType } from "@prisma/client";
 import db from "../db.server";
+import { getProductUrlFromGid, getProductVariantUrlFromGid } from "../utils/url.server";
 
 // NO_IMAGE -> ARCHIVE / UPLOAD_IMAGE
 // SHORT_TITLE -> UPDATE_TITLE
@@ -89,6 +90,7 @@ export async function initializeAllProducts(
           targetType: TargetType.PRODUCT,
           targetId: node.id,
           targetTitle: node.title,
+          targetUrl: getProductUrlFromGid(node.id),
           recommendationType: type as RecommendationType,
           status: "PENDING",
         })),
@@ -163,6 +165,7 @@ export async function initializeAllProductVariants(
           targetTitle: node.product.hasOnlyDefaultVariant
             ? node.product.title
             : `${node.product.title} - ${node.title}`,
+          targetUrl: getProductVariantUrlFromGid(node.product.id, node.id),
           recommendationType: type as RecommendationType,
           status: "PENDING",
         })),
