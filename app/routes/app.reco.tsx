@@ -42,6 +42,8 @@ async function getAllCounts(shop: string) {
       RecommendationType.LONG_DESCRIPTION,
       RecommendationType.NO_STOCK,
       RecommendationType.NO_COST,
+      RecommendationType.CHEAP,
+      RecommendationType.EXPENSIVE,
     ].map(async (type) => {
       const count = await getRecommendationCount(shop, type);
       return [TAB_DEFINITIONS.find(tab => tab.type === type)?.id ?? '', count] as const;
@@ -92,6 +94,8 @@ const TAB_DEFINITIONS = [
   { id: "longDescriptionProducts", content: "Long Desc", type: RecommendationType.LONG_DESCRIPTION },
   { id: "noStockProducts", content: "No Stock", type: RecommendationType.NO_STOCK },
   { id: "noCostProductVariants", content: "No Cost", type: RecommendationType.NO_COST },
+  { id: "cheapProductVariants", content: "Cheap", type: RecommendationType.CHEAP },
+  { id: "expensiveProductVariants", content: "Expensive", type: RecommendationType.EXPENSIVE },
 ];
 
 const PAGE_SIZE = 10;
@@ -103,13 +107,15 @@ export default function Index() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [page, setPage] = useState(1);
 
-  const tabs = TAB_DEFINITIONS.filter((tab) => data.counts[tab.id] > 0);
+  const tabs = TAB_DEFINITIONS.filter((tab) =>
+    (fetcher.data?.counts ?? data.counts)[tab.id] > 0
+  );
 
   useEffect(() => {
     if (tabs.length > 0) {
       fetcher.load(`/app/reco?tab=${tabs[selectedTab].id}&page=${page}&size=${PAGE_SIZE}`);
     }
-  }, [selectedTab, page]);
+  }, [tabs.length, selectedTab, page]);
 
   const activeTabData = fetcher.data?.activeTab ?? data.activeTab;
   const recommendations = activeTabData?.data ?? [];

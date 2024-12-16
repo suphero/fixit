@@ -12,9 +12,33 @@ import { getProductUrlFromGid, getProductVariantUrlFromGid } from "../utils/url.
 // NO_STOCK -> ARCHIVE
 // NO_COST -> DEFINE_COST
 
+// Add type for variant node
+type ProductVariantNode = {
+  id: string;
+  title: string;
+  price: { amount: string; currencyCode: string };
+  inventoryItem: {
+    unitCost: { amount: string; currencyCode: string } | null;
+  };
+  product: {
+    id: string;
+    title: string;
+    hasOnlyDefaultVariant: boolean;
+  };
+};
+
+// Add type for product node
+type ProductNode = {
+  id: string;
+  title: string;
+  description: string;
+  totalInventory: number;
+  featuredMedia: { id: string } | null;
+};
+
 const PRODUCT_RECOMMENDATION_CRITERIA = {
   NO_IMAGE: {
-    filter: (node: any) => node.featuredMedia === null,
+    filter: (node: ProductNode) => node.featuredMedia === null,
   },
   SHORT_TITLE: {
     filter: (node: any) => node.title.length < 10,
@@ -35,7 +59,27 @@ const PRODUCT_RECOMMENDATION_CRITERIA = {
 
 const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
   NO_COST: {
-    filter: (node: any) => node?.inventoryItem?.unitCost === null,
+    filter: (node: ProductVariantNode) => node.inventoryItem?.unitCost === null,
+  },
+  CHEAP: {
+    filter: (node: ProductVariantNode) => {
+      const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
+      const price = Number(node.price ?? 0);
+      if (cost === 0 || price === 0) return false;
+
+      const minimumPrice = cost * 1.2; // 20% profit margin
+      return price < minimumPrice;
+    },
+  },
+  EXPENSIVE: {
+    filter: (node: ProductVariantNode) => {
+      const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
+      const price = Number(node.price ?? 0);
+      if (cost === 0 || price === 0) return false;
+
+      const maximumPrice = cost * 1.8; // 80% profit margin
+      return price > maximumPrice;
+    },
   },
 };
 
@@ -127,6 +171,7 @@ export async function initializeAllProductVariants(
               node {
                 id
                 title
+                price
                 inventoryItem {
                   unitCost {
                     amount

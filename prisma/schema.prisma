@@ -48,8 +48,8 @@ enum TargetType {
 enum RecommendationType {
   UNDERSTOCK
   OVERSTOCK
-  UNDERPRICED
-  OVERPRICED
+  CHEAP
+  EXPENSIVE
   NO_COST
   SALE_AT_LOSS
   NO_STOCK
