@@ -38,28 +38,49 @@ type ProductNode = {
   featuredMedia: { id: string } | null;
 };
 
-const PRODUCT_RECOMMENDATION_CRITERIA = {
+// Add function to get settings
+async function getShopSettings(request: Request) {
+  const { session } = await authenticate.admin(request);
+  const settings = await db.settings.findFirst({
+    where: { shopId: session.shop },
+  });
+
+  // Return default settings if none exist
+  return settings ?? {
+    shortTitleLength: 10,
+    longTitleLength: 100,
+    shortDescriptionLength: 50,
+    longDescriptionLength: 500,
+    minRevenueRate: 0.2,
+    maxRevenueRate: 0.8,
+    lowDiscountRate: 0.1,
+    highDiscountRate: 0.5,
+  };
+}
+
+// Update the criteria to use settings
+const createProductRecommendationCriteria = (settings: any) => ({
   NO_IMAGE: {
     filter: (node: ProductNode) => node.featuredMedia === null,
   },
   SHORT_TITLE: {
-    filter: (node: any) => node.title.length < 10,
+    filter: (node: ProductNode) => node.title.length < settings.shortTitleLength,
   },
   LONG_TITLE: {
-    filter: (node: any) => node.title.length > 50,
+    filter: (node: ProductNode) => node.title.length > settings.longTitleLength,
   },
   SHORT_DESCRIPTION: {
-    filter: (node: any) => node.description.length < 100,
+    filter: (node: ProductNode) => node.description.length < settings.shortDescriptionLength,
   },
   LONG_DESCRIPTION: {
-    filter: (node: any) => node.description.length > 1000,
+    filter: (node: ProductNode) => node.description.length > settings.longDescriptionLength,
   },
   NO_STOCK: {
-    filter: (node: any) => node.totalInventory === 0,
+    filter: (node: ProductNode) => node.totalInventory === 0,
   },
-};
+});
 
-const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
+const createVariantRecommendationCriteria = (settings: any) => ({
   NO_COST: {
     filter: (node: ProductVariantNode) => node.inventoryItem?.unitCost === null,
   },
@@ -68,7 +89,6 @@ const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
       const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
       const price = Number(node.price ?? 0);
       if (cost === 0 || price === 0) return false;
-
       return price < cost;
     },
   },
@@ -77,9 +97,7 @@ const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
       const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
       const price = Number(node.price ?? 0);
       if (cost === 0 || price === 0) return false;
-
-      // Price should be above cost but below 20% profit margin
-      return price >= cost && price < (cost * 1.2);
+      return price >= cost && price < (cost * (1 + settings.minRevenueRate));
     },
   },
   EXPENSIVE: {
@@ -87,9 +105,7 @@ const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
       const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
       const price = Number(node.price ?? 0);
       if (cost === 0 || price === 0) return false;
-
-      const maximumPrice = cost * 1.8; // 80% profit margin
-      return price > maximumPrice;
+      return price > (cost * (1 + settings.maxRevenueRate));
     },
   },
   LOW_DISCOUNT: {
@@ -97,9 +113,8 @@ const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
       const price = Number(node.price ?? 0);
       const compareAtPrice = Number(node.compareAtPrice ?? 0);
       if (compareAtPrice === 0) return false;
-
       const discountPercentage = ((compareAtPrice - price) / compareAtPrice) * 100;
-      return discountPercentage > 0 && discountPercentage < 10;
+      return discountPercentage > 0 && discountPercentage < (settings.lowDiscountRate * 100);
     },
   },
   HIGH_DISCOUNT: {
@@ -107,18 +122,20 @@ const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
       const price = Number(node.price ?? 0);
       const compareAtPrice = Number(node.compareAtPrice ?? 0);
       if (compareAtPrice === 0) return false;
-
       const discountPercentage = ((compareAtPrice - price) / compareAtPrice) * 100;
-      return discountPercentage > 90;
+      return discountPercentage > (settings.highDiscountRate * 100);
     },
   },
-};
+});
 
 export async function initializeAllProducts(
   request: Request,
   graphql: AdminGraphqlClient,
 ) {
   const { session } = await authenticate.admin(request);
+  const settings = await getShopSettings(request);
+  const PRODUCT_RECOMMENDATION_CRITERIA = createProductRecommendationCriteria(settings);
+
   await db.recommendation.deleteMany({
     where: {
       shop: session.shop,
@@ -191,6 +208,9 @@ export async function initializeAllProductVariants(
   graphql: AdminGraphqlClient,
 ) {
   const { session } = await authenticate.admin(request);
+  const settings = await getShopSettings(request);
+  const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = createVariantRecommendationCriteria(settings);
+
   await db.recommendation.deleteMany({
     where: {
       shop: session.shop,
