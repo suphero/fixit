@@ -3,6 +3,7 @@ import type { RecommendationType } from "@prisma/client";
 import { TargetType } from "@prisma/client";
 import db from "../db.server";
 import { getProductUrlFromGid, getProductVariantUrlFromGid } from "../utils/url.server";
+import { authenticate } from "../shopify.server";
 
 // NO_IMAGE -> ARCHIVE / UPLOAD_IMAGE
 // SHORT_TITLE -> UPDATE_TITLE
@@ -114,11 +115,15 @@ const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = {
 };
 
 export async function initializeAllProducts(
-  shop: string,
+  request: Request,
   graphql: AdminGraphqlClient,
 ) {
+  const { session } = await authenticate.admin(request);
   await db.recommendation.deleteMany({
-    where: { shop, targetType: TargetType.PRODUCT },
+    where: {
+      shop: session.shop,
+      targetType: TargetType.PRODUCT
+    },
   });
 
   let hasNextPage = true;
@@ -160,7 +165,7 @@ export async function initializeAllProducts(
       Object.entries(PRODUCT_RECOMMENDATION_CRITERIA)
         .filter(([, config]) => config.filter(node))
         .map(([type]) => ({
-          shop,
+          shop: session.shop,
           targetType: TargetType.PRODUCT,
           targetId: node.id,
           targetTitle: node.title,
@@ -182,11 +187,15 @@ export async function initializeAllProducts(
 }
 
 export async function initializeAllProductVariants(
-  shop: string,
+  request: Request,
   graphql: AdminGraphqlClient,
 ) {
+  const { session } = await authenticate.admin(request);
   await db.recommendation.deleteMany({
-    where: { shop, targetType: TargetType.PRODUCT_VARIANT },
+    where: {
+      shop: session.shop,
+      targetType: TargetType.PRODUCT_VARIANT
+    },
   });
 
   let hasNextPage = true;
@@ -235,7 +244,7 @@ export async function initializeAllProductVariants(
       Object.entries(PRODUCT_VARIANT_RECOMMENDATION_CRITERIA)
         .filter(([, config]) => config.filter(node))
         .map(([type]) => ({
-          shop,
+          shop: session.shop,
           targetType: TargetType.PRODUCT_VARIANT,
           targetId: node.id,
           targetTitle: node.product.hasOnlyDefaultVariant
@@ -259,25 +268,33 @@ export async function initializeAllProductVariants(
 }
 
 export async function getRecommendationCount(
-  shop: string,
+  request: Request,
   recommendationType: RecommendationType,
 ) {
+  const { session } = await authenticate.admin(request);
   return prisma.recommendation.count({
-    where: { shop, recommendationType },
+    where: {
+      shop: session.shop,
+      recommendationType
+    },
   });
 }
 
 export async function getRecommendationList(
-  shop: string,
+  request: Request,
   recommendationType: RecommendationType,
   page: number,
   size: number,
 ) {
+  const { session } = await authenticate.admin(request);
   const skip = (page - 1) * size;
   const take = size;
 
   return prisma.recommendation.findMany({
-    where: { shop, recommendationType },
+    where: {
+      shop: session.shop,
+      recommendationType
+    },
     skip,
     take,
     orderBy: { createdAt: "desc" },

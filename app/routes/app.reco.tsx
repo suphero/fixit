@@ -32,7 +32,7 @@ type LoaderData = {
   }
 };
 
-async function getAllCounts(shop: string) {
+async function getAllCounts(request: Request) {
   const counts = await Promise.all(
     [
       RecommendationType.NO_IMAGE,
@@ -48,7 +48,7 @@ async function getAllCounts(shop: string) {
       RecommendationType.HIGH_DISCOUNT,
       RecommendationType.SALE_AT_LOSS,
     ].map(async (type) => {
-      const count = await getRecommendationCount(shop, type);
+      const count = await getRecommendationCount(request, type);
       return [TAB_DEFINITIONS.find(tab => tab.type === type)?.id ?? '', count] as const;
     })
   );
@@ -63,15 +63,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const tabId = url.searchParams.get("tab");
 
   const { session } = await authenticate.admin(request);
-  const counts = await getAllCounts(session.shop);
+  const counts = await getAllCounts(request);
 
   let activeTab;
   if (tabId) {
     const type = TAB_DEFINITIONS.find(tab => tab.id === tabId)?.type;
     if (type) {
       const [count, data] = await Promise.all([
-        getRecommendationCount(session.shop, type),
-        getRecommendationList(session.shop, type, page, size),
+        getRecommendationCount(request, type),
+        getRecommendationList(request, type, page, size),
       ]);
       activeTab = { id: tabId, count, data };
     }
@@ -82,10 +82,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   const { admin, session } = await authenticate.admin(request);
-  await initializeAllProducts(session.shop, admin.graphql);
-  await initializeAllProductVariants(session.shop, admin.graphql);
+  await initializeAllProducts(request, admin.graphql);
+  await initializeAllProductVariants(request, admin.graphql);
 
-  const counts = await getAllCounts(session.shop);
+  const counts = await getAllCounts(request);
   return { shop: session.shop, counts };
 }
 
