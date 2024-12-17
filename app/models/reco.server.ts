@@ -136,11 +136,32 @@ export async function initializeAllProducts(
   const settings = await getShopSettings(request);
   const PRODUCT_RECOMMENDATION_CRITERIA = createProductRecommendationCriteria(settings);
 
+  // Get existing ignored recommendations
+  const ignoredRecommendations = await db.recommendation.findMany({
+    where: {
+      shop: session.shop,
+      targetType: TargetType.PRODUCT,
+      status: 'IGNORED',
+    },
+    select: {
+      targetId: true,
+      recommendationType: true,
+    },
+  });
+
+  // Create a Set for quick lookup
+  const ignoredSet = new Set(
+    ignoredRecommendations.map(
+      rec => `${rec.targetId}-${rec.recommendationType}`
+    )
+  );
+
+  // Delete only pending recommendations
   await db.recommendation.deleteMany({
     where: {
       shop: session.shop,
       targetType: TargetType.PRODUCT,
-      status: RecommendationStatus.PENDING
+      status: 'PENDING',
     },
   });
 
@@ -182,6 +203,7 @@ export async function initializeAllProducts(
     const recommendations = edges.flatMap(({ node }: any) =>
       Object.entries(PRODUCT_RECOMMENDATION_CRITERIA)
         .filter(([, config]) => config.filter(node))
+        .filter(([type]) => !ignoredSet.has(`${node.id}-${type}`))
         .map(([type]) => ({
           shop: session.shop,
           targetType: TargetType.PRODUCT,
@@ -292,13 +314,16 @@ export async function initializeAllProductVariants(
 export async function getRecommendationCount(
   request: Request,
   recommendationType: RecommendationType,
+  includeSkipped = false
 ) {
   const { session } = await authenticate.admin(request);
   return prisma.recommendation.count({
     where: {
       shop: session.shop,
       recommendationType,
-      status: RecommendationStatus.PENDING
+      status: includeSkipped
+        ? { in: ['PENDING', 'IGNORED'] }
+        : 'PENDING'
     },
   });
 }
@@ -308,6 +333,7 @@ export async function getRecommendationList(
   recommendationType: RecommendationType,
   page: number,
   size: number,
+  includeSkipped = false
 ) {
   const { session } = await authenticate.admin(request);
   const skip = (page - 1) * size;
@@ -317,7 +343,9 @@ export async function getRecommendationList(
     where: {
       shop: session.shop,
       recommendationType,
-      status: RecommendationStatus.PENDING
+      status: includeSkipped
+        ? { in: ['PENDING', 'IGNORED'] }
+        : 'PENDING'
     },
     skip,
     take,
@@ -381,5 +409,47 @@ export async function updateProductTitle(
       status: 'RESOLVED',
       targetTitle: newTitle,
     },
+  });
+}
+
+export async function skipRecommendation(
+  request: Request,
+  recommendationId: string,
+) {
+  const { session } = await authenticate.admin(request);
+
+  // Get the recommendation
+  const recommendation = await db.recommendation.findFirst({
+    where: { id: recommendationId, shop: session.shop },
+  });
+
+  if (!recommendation) {
+    throw new Error('Recommendation not found');
+  }
+
+  // Update recommendation status to IGNORED
+  return db.recommendation.update({
+    where: { id: recommendationId },
+    data: { status: 'IGNORED' },
+  });
+}
+
+export async function unskipRecommendation(
+  request: Request,
+  recommendationId: string,
+) {
+  const { session } = await authenticate.admin(request);
+
+  const recommendation = await db.recommendation.findFirst({
+    where: { id: recommendationId, shop: session.shop },
+  });
+
+  if (!recommendation) {
+    throw new Error('Recommendation not found');
+  }
+
+  return db.recommendation.update({
+    where: { id: recommendationId },
+    data: { status: 'PENDING' },
   });
 }

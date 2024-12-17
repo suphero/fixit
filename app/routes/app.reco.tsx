@@ -22,6 +22,7 @@ import {
   getRecommendationList,
   updateProductTitle,
   getShopSettings,
+  skipRecommendation,
 } from "../models/reco.server";
 import { getShopifyAdminUrl } from "../utils/url";
 
@@ -46,7 +47,7 @@ type LoaderData = {
   }
 };
 
-async function getAllCounts(request: Request) {
+async function getAllCounts(request: Request, showSkipped: boolean) {
   const counts = await Promise.all(
     [
       RecommendationType.NO_IMAGE,
@@ -62,7 +63,7 @@ async function getAllCounts(request: Request) {
       RecommendationType.HIGH_DISCOUNT,
       RecommendationType.SALE_AT_LOSS,
     ].map(async (type) => {
-      const count = await getRecommendationCount(request, type);
+      const count = await getRecommendationCount(request, type, showSkipped);
       return [TAB_DEFINITIONS.find(tab => tab.type === type)?.id ?? '', count] as const;
     })
   );
@@ -75,10 +76,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const page = Number(url.searchParams.get("page") ?? "1");
   const size = Number(url.searchParams.get("size") ?? "10");
   const tabId = url.searchParams.get("tab");
+  const showSkipped = url.searchParams.get("showSkipped") === "true";
 
   const { session } = await authenticate.admin(request);
   const [counts, settings] = await Promise.all([
-    getAllCounts(request),
+    getAllCounts(request, showSkipped),
     getShopSettings(request)
   ]);
 
@@ -87,8 +89,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const type = TAB_DEFINITIONS.find(tab => tab.id === tabId)?.type;
     if (type) {
       const [count, data] = await Promise.all([
-        getRecommendationCount(request, type),
-        getRecommendationList(request, type, page, size),
+        getRecommendationCount(request, type, showSkipped),
+        getRecommendationList(request, type, page, size, showSkipped),
       ]);
       activeTab = { id: tabId, count, data };
     }
@@ -101,20 +103,29 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const { admin, session } = await authenticate.admin(request);
   const action = formData.get('action');
+  const showSkipped = formData.get('showSkipped') === 'true';
 
   if (action === 'updateTitle') {
     const recommendationId = formData.get('recommendationId') as string;
     const newTitle = formData.get('newTitle') as string;
     await updateProductTitle(request, recommendationId, newTitle);
 
-    const counts = await getAllCounts(request);
+    const counts = await getAllCounts(request, showSkipped);
+    return { shop: session.shop, counts };
+  }
+
+  if (action === 'skip') {
+    const recommendationId = formData.get('recommendationId') as string;
+    await skipRecommendation(request, recommendationId);
+
+    const counts = await getAllCounts(request, showSkipped);
     return { shop: session.shop, counts };
   }
 
   await initializeAllProducts(request, admin.graphql);
   await initializeAllProductVariants(request, admin.graphql);
 
-  const counts = await getAllCounts(request);
+  const counts = await getAllCounts(request, showSkipped);
   return { shop: session.shop, counts };
 }
 
@@ -144,6 +155,7 @@ export default function Index() {
   const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [updateError, setUpdateError] = useState('');
+  const [showSkipped, setShowSkipped] = useState(false);
 
   const tabs = TAB_DEFINITIONS.filter((tab) =>
     (fetcher.data?.counts ?? data.counts)[tab.id] > 0
@@ -151,9 +163,9 @@ export default function Index() {
 
   useEffect(() => {
     if (tabs.length > 0) {
-      fetcher.load(`/app/reco?tab=${tabs[selectedTab].id}&page=${page}&size=${PAGE_SIZE}`);
+      fetcher.load(`/app/reco?tab=${tabs[selectedTab].id}&page=${page}&size=${PAGE_SIZE}&showSkipped=${showSkipped}`);
     }
-  }, [tabs.length, selectedTab, page]);
+  }, [tabs.length, selectedTab, page, showSkipped]);
 
   const activeTabData = fetcher.data?.activeTab ?? data.activeTab;
   const recommendations = activeTabData?.data ?? [];
@@ -233,20 +245,52 @@ export default function Index() {
           {createdAt.toLocaleDateString()}
         </IndexTable.Cell>
         <IndexTable.Cell>
-          {(recommendation.recommendationType === 'SHORT_TITLE' ||
-            recommendation.recommendationType === 'LONG_TITLE') && (
+          {recommendation.status === 'IGNORED' ? (
             <Button
               onClick={() => {
-                setSelectedRecommendation({
-                  ...recommendation,
-                  createdAt,
-                  updatedAt,
-                });
-                setNewTitle(recommendation.targetTitle);
+                fetcher.submit(
+                  {
+                    action: 'unskip',
+                    recommendationId: recommendation.id,
+                  },
+                  { method: 'post' }
+                );
               }}
             >
-              Edit Title
+              Unskip
             </Button>
+          ) : (
+            <>
+              {(recommendation.recommendationType === 'SHORT_TITLE' ||
+                recommendation.recommendationType === 'LONG_TITLE') && (
+                <Button
+                  onClick={() => {
+                    setSelectedRecommendation({
+                      ...recommendation,
+                      createdAt,
+                      updatedAt,
+                    });
+                    setNewTitle(recommendation.targetTitle);
+                  }}
+                >
+                  Edit Title
+                </Button>
+              )}
+              <Button
+                tone="critical"
+                onClick={() => {
+                  fetcher.submit(
+                    {
+                      action: 'skip',
+                      recommendationId: recommendation.id,
+                    },
+                    { method: 'post' }
+                  );
+                }}
+              >
+                Skip
+              </Button>
+            </>
           )}
         </IndexTable.Cell>
       </IndexTable.Row>
@@ -273,6 +317,14 @@ export default function Index() {
         loading: fetcher.state === "submitting",
       }}
     >
+      <div style={{ padding: "16px 0" }}>
+        <Button
+          onClick={() => setShowSkipped(!showSkipped)}
+          pressed={showSkipped}
+        >
+          {showSkipped ? "Hide Skipped" : "Show Skipped"}
+        </Button>
+      </div>
       <IndexFilters
         tabs={tabs}
         selected={selectedTab}
