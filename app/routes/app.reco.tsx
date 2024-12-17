@@ -3,10 +3,12 @@ import {
   IndexTable,
   IndexFilters,
   Text,
-  useIndexResourceState,
   useSetIndexFiltersMode,
-  INDEX_TABLE_SELECT_ALL_ITEMS,
   Link,
+  Modal,
+  TextField,
+  Banner,
+  Button,
 } from "@shopify/polaris";
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
@@ -18,6 +20,8 @@ import {
   initializeAllProductVariants,
   getRecommendationCount,
   getRecommendationList,
+  updateProductTitle,
+  getShopSettings,
 } from "../models/reco.server";
 import { getShopifyAdminUrl } from "../utils/url";
 
@@ -25,6 +29,16 @@ type RecommendationCount = Record<string, number>;
 type LoaderData = {
   shop: string;
   counts: RecommendationCount;
+  settings: {
+    shortTitleLength: number;
+    longTitleLength: number;
+    shortDescriptionLength: number;
+    longDescriptionLength: number;
+    minRevenueRate: number;
+    maxRevenueRate: number;
+    lowDiscountRate: number;
+    highDiscountRate: number;
+  };
   activeTab?: {
     id: string;
     data: Recommendation[];
@@ -63,7 +77,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const tabId = url.searchParams.get("tab");
 
   const { session } = await authenticate.admin(request);
-  const counts = await getAllCounts(request);
+  const [counts, settings] = await Promise.all([
+    getAllCounts(request),
+    getShopSettings(request)
+  ]);
 
   let activeTab;
   if (tabId) {
@@ -77,11 +94,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
-  return { shop: session.shop, counts, activeTab };
+  return { shop: session.shop, counts, settings, activeTab };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
   const { admin, session } = await authenticate.admin(request);
+  const action = formData.get('action');
+
+  if (action === 'updateTitle') {
+    const recommendationId = formData.get('recommendationId') as string;
+    const newTitle = formData.get('newTitle') as string;
+    await updateProductTitle(request, recommendationId, newTitle);
+
+    const counts = await getAllCounts(request);
+    return { shop: session.shop, counts };
+  }
+
   await initializeAllProducts(request, admin.graphql);
   await initializeAllProductVariants(request, admin.graphql);
 
@@ -112,6 +141,9 @@ export default function Index() {
   const { mode, setMode } = useSetIndexFiltersMode();
   const [selectedTab, setSelectedTab] = useState(0);
   const [page, setPage] = useState(1);
+  const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
+  const [newTitle, setNewTitle] = useState('');
+  const [updateError, setUpdateError] = useState('');
 
   const tabs = TAB_DEFINITIONS.filter((tab) =>
     (fetcher.data?.counts ?? data.counts)[tab.id] > 0
@@ -126,9 +158,6 @@ export default function Index() {
   const activeTabData = fetcher.data?.activeTab ?? data.activeTab;
   const recommendations = activeTabData?.data ?? [];
   const totalCount = activeTabData?.count ?? 0;
-
-  const { selectedResources, allResourcesSelected, handleSelectionChange } =
-    useIndexResourceState(recommendations);
 
   const isLoading = fetcher.state !== "idle";
 
@@ -157,17 +186,41 @@ export default function Index() {
   const truncate = (str: string, length = 50) =>
     str?.length > length ? str.slice(0, length) + "…" : str || "";
 
+  const handleUpdateTitle = async () => {
+    try {
+      setUpdateError('');
+      await fetcher.submit(
+        {
+          recommendationId: selectedRecommendation?.id ?? '',
+          newTitle,
+          action: 'updateTitle',
+        },
+        { method: 'post' }
+      );
+      setSelectedRecommendation(null);
+      setNewTitle('');
+    } catch (error: any) {
+      setUpdateError(error.message);
+    }
+  };
+
+  const handleModalClose = () => {
+    setSelectedRecommendation(null);
+    setNewTitle('');
+    setUpdateError('');
+  };
+
   const rowMarkup = recommendations.map((recommendation, index) => {
+    const createdAt = new Date(recommendation.createdAt);
+    const updatedAt = new Date(recommendation.updatedAt);
     return (
       <IndexTable.Row
         id={recommendation.id}
         key={recommendation.id}
-        selected={selectedResources.includes(recommendation.id)}
         position={index}
       >
         <IndexTable.Cell>
           <Link
-            dataPrimaryLink
             url={getShopifyAdminUrl(shop, recommendation.targetUrl)}
             target="_blank"
           >
@@ -177,7 +230,24 @@ export default function Index() {
           </Link>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          {new Date(recommendation.createdAt).toLocaleDateString()}
+          {createdAt.toLocaleDateString()}
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          {(recommendation.recommendationType === 'SHORT_TITLE' ||
+            recommendation.recommendationType === 'LONG_TITLE') && (
+            <Button
+              onClick={() => {
+                setSelectedRecommendation({
+                  ...recommendation,
+                  createdAt,
+                  updatedAt,
+                });
+                setNewTitle(recommendation.targetTitle);
+              }}
+            >
+              Edit Title
+            </Button>
+          )}
         </IndexTable.Cell>
       </IndexTable.Row>
     );
@@ -218,16 +288,52 @@ export default function Index() {
         hideQueryField
         loading={isLoading}
       />
+      <Modal
+        open={selectedRecommendation !== null}
+        onClose={handleModalClose}
+        title="Update Product Title"
+        primaryAction={{
+          content: 'Update',
+          onAction: handleUpdateTitle,
+          loading: fetcher.state === 'submitting',
+        }}
+        secondaryActions={[
+          {
+            content: 'Cancel',
+            onAction: handleModalClose,
+          },
+        ]}
+      >
+        <Modal.Section>
+          {updateError && (
+            <Banner tone="critical">
+              {updateError}
+            </Banner>
+          )}
+          <TextField
+            label="New Title"
+            value={newTitle}
+            onChange={setNewTitle}
+            autoComplete="off"
+            error={
+              newTitle.length < data.settings.shortTitleLength
+                ? `Title must be at least ${data.settings.shortTitleLength} characters`
+                : newTitle.length > data.settings.longTitleLength
+                ? `Title must not exceed ${data.settings.longTitleLength} characters`
+                : undefined
+            }
+            helpText={`Title length should be between ${data.settings.shortTitleLength} and ${data.settings.longTitleLength} characters`}
+            showCharacterCount
+          />
+        </Modal.Section>
+      </Modal>
       <IndexTable
         resourceName={resourceName}
         itemCount={totalCount}
-        selectedItemsCount={
-          allResourcesSelected ? INDEX_TABLE_SELECT_ALL_ITEMS : selectedResources.length
-        }
-        onSelectionChange={handleSelectionChange}
         headings={[
           { title: "Title" },
           { title: "Date Created" },
+          { title: "" },
         ]}
         loading={isLoading}
         pagination={{

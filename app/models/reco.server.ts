@@ -1,6 +1,6 @@
 import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 import type { RecommendationType } from "@prisma/client";
-import { TargetType } from "@prisma/client";
+import { RecommendationStatus, TargetType } from "@prisma/client";
 import db from "../db.server";
 import { getProductUrlFromGid, getProductVariantUrlFromGid } from "../utils/url.server";
 import { authenticate } from "../shopify.server";
@@ -39,7 +39,7 @@ type ProductNode = {
 };
 
 // Add function to get settings
-async function getShopSettings(request: Request) {
+export async function getShopSettings(request: Request) {
   const { session } = await authenticate.admin(request);
   const settings = await db.settings.findFirst({
     where: { shopId: session.shop },
@@ -139,7 +139,8 @@ export async function initializeAllProducts(
   await db.recommendation.deleteMany({
     where: {
       shop: session.shop,
-      targetType: TargetType.PRODUCT
+      targetType: TargetType.PRODUCT,
+      status: RecommendationStatus.PENDING
     },
   });
 
@@ -214,7 +215,8 @@ export async function initializeAllProductVariants(
   await db.recommendation.deleteMany({
     where: {
       shop: session.shop,
-      targetType: TargetType.PRODUCT_VARIANT
+      targetType: TargetType.PRODUCT_VARIANT,
+      status: RecommendationStatus.PENDING
     },
   });
 
@@ -295,7 +297,8 @@ export async function getRecommendationCount(
   return prisma.recommendation.count({
     where: {
       shop: session.shop,
-      recommendationType
+      recommendationType,
+      status: RecommendationStatus.PENDING
     },
   });
 }
@@ -313,10 +316,70 @@ export async function getRecommendationList(
   return prisma.recommendation.findMany({
     where: {
       shop: session.shop,
-      recommendationType
+      recommendationType,
+      status: RecommendationStatus.PENDING
     },
     skip,
     take,
     orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function updateProductTitle(
+  request: Request,
+  recommendationId: string,
+  newTitle: string
+) {
+  const { session, admin } = await authenticate.admin(request);
+  const settings = await getShopSettings(request);
+
+  // Get the recommendation
+  const recommendation = await db.recommendation.findFirst({
+    where: { id: recommendationId, shop: session.shop },
+  });
+
+  if (!recommendation) {
+    throw new Error('Recommendation not found');
+  }
+
+  // Validate title length based on recommendation type
+  if (newTitle.length < settings.shortTitleLength) {
+    throw new Error(`Title must be at least ${settings.shortTitleLength} characters`);
+  }
+  if (newTitle.length > settings.longTitleLength) {
+    throw new Error(`Title must not exceed ${settings.longTitleLength} characters`);
+  }
+
+  // Update product title in Shopify
+  await admin.graphql(
+    `mutation updateProduct($input: ProductInput!) {
+      productUpdate(input: $input) {
+        product {
+          id
+          title
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }`,
+    {
+      variables: {
+        input: {
+          id: recommendation.targetId,
+          title: newTitle,
+        },
+      },
+    },
+  );
+
+  // Update recommendation status
+  return db.recommendation.update({
+    where: { id: recommendationId },
+    data: {
+      status: 'RESOLVED',
+      targetTitle: newTitle,
+    },
   });
 }
