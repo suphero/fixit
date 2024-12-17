@@ -4,7 +4,6 @@ import {
   IndexFilters,
   Text,
   useSetIndexFiltersMode,
-  Link,
   Modal,
   TextField,
   Banner,
@@ -232,14 +231,14 @@ export default function Index() {
         position={index}
       >
         <IndexTable.Cell>
-          <Link
-            url={getShopifyAdminUrl(shop, recommendation.targetUrl)}
-            target="_blank"
+          <Button
+            variant="plain"
+            onClick={() => {
+              window.open(getShopifyAdminUrl(shop, recommendation.targetUrl), '_blank');
+            }}
           >
-            <Text fontWeight="bold" as="span">
-              {truncate(recommendation.targetTitle)}
-            </Text>
-          </Link>
+            {truncate(recommendation.targetTitle)}
+          </Button>
         </IndexTable.Cell>
         <IndexTable.Cell>
           {createdAt.toLocaleDateString()}
