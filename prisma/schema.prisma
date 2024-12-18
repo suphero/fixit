@@ -31,6 +31,8 @@ model Recommendation {
   shop                String
   targetType          TargetType
   targetId            String
+  productId           String?
+  variantId           String?
   targetTitle         String
   targetUrl           String
   type                RecommendationType

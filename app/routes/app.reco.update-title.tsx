@@ -1,4 +1,4 @@
-import { Modal, Banner, TextField } from "@shopify/polaris";
+import { Modal, Banner, TextField, Text, BlockStack } from "@shopify/polaris";
 import type { Recommendation } from "@prisma/client";
 import { useFetcher } from "@remix-run/react";
 import { useState, useEffect } from "react";
@@ -52,6 +52,16 @@ export function UpdateTitleModal({ recommendation, settings, onClose }: UpdateTi
     );
   };
 
+  const getErrorMessage = (length: number, settings: { shortTitleLength: number; longTitleLength: number }) => {
+    if (length < settings.shortTitleLength) {
+      return `Title must be at least ${settings.shortTitleLength} characters`;
+    }
+    if (length > settings.longTitleLength) {
+      return `Title must not exceed ${settings.longTitleLength} characters`;
+    }
+    return undefined;
+  };
+
   return (
     <Modal
       open={recommendation !== null}
@@ -75,21 +85,24 @@ export function UpdateTitleModal({ recommendation, settings, onClose }: UpdateTi
             {updateError}
           </Banner>
         )}
-        <TextField
-          label="New Title"
-          value={newTitle}
-          onChange={setNewTitle}
-          autoComplete="off"
-          error={
-            newTitle.length < settings.shortTitleLength
-              ? `Title must be at least ${settings.shortTitleLength} characters`
-              : newTitle.length > settings.longTitleLength
-              ? `Title must not exceed ${settings.longTitleLength} characters`
-              : undefined
-          }
-          helpText={`Title length should be between ${settings.shortTitleLength} and ${settings.longTitleLength} characters`}
-          showCharacterCount
-        />
+        <BlockStack gap="400">
+          <Text as="p">
+            Current Title: {recommendation?.targetTitle}
+          </Text>
+          <TextField
+            label="New Title"
+            value={newTitle}
+            onChange={setNewTitle}
+            autoComplete="off"
+            error={getErrorMessage(newTitle.length, settings)}
+            helpText={
+              newTitle.length >= settings.shortTitleLength && newTitle.length <= settings.longTitleLength
+                ? `Title length should be between ${settings.shortTitleLength} and ${settings.longTitleLength} characters`
+                : undefined
+            }
+            showCharacterCount
+          />
+        </BlockStack>
       </Modal.Section>
     </Modal>
   );

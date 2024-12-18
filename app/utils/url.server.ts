@@ -4,7 +4,11 @@ export function getProductUrlFromGid(gid: string) {
   return `/products/${id}`;
 }
 
-export function getProductVariantUrlFromGid(productGid: string, variantGid: string) {
+export function getProductVariantUrlFromGid(productGid: string, variantGid: string, hasOnlyDefaultVariant: boolean) {
+  if (hasOnlyDefaultVariant) {
+    const productId = productGid.split('/').pop();
+    return `/products/${productId}`;
+  }
   const productId = productGid.split('/').pop();
   const variantId = variantGid.split('/').pop();
   return `/products/${productId}/variants/${variantId}`;

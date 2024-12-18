@@ -21,6 +21,7 @@ import {
 import { getShopSettings } from "../models/settings.server";
 import { getShopifyAdminUrl } from "../utils/url";
 import { UpdateTitleModal } from "./app.reco.update-title";
+import { UpdatePriceModal } from "./app.reco.update-price";
 
 type RecommendationCount = Record<string, number>;
 type LoaderData = {
@@ -139,7 +140,8 @@ export default function Index() {
   const { mode, setMode } = useSetIndexFiltersMode();
   const [selectedTab, setSelectedTab] = useState(0);
   const [page, setPage] = useState(1);
-  const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
+  const [selectedTitleRecommendation, setSelectedTitleRecommendation] = useState<Recommendation | null>(null);
+  const [selectedPriceRecommendation, setSelectedPriceRecommendation] = useState<Recommendation | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
 
   const tabs = TAB_DEFINITIONS.map((tab) => {
@@ -231,7 +233,7 @@ export default function Index() {
                 recommendation.type === 'LONG_TITLE') && (
                 <Button
                   onClick={() => {
-                    setSelectedRecommendation({
+                    setSelectedTitleRecommendation({
                       ...recommendation,
                       createdAt,
                       updatedAt,
@@ -239,6 +241,20 @@ export default function Index() {
                   }}
                 >
                   Edit Title
+                </Button>
+              )}
+              {(recommendation.type === 'CHEAP' ||
+                recommendation.type === 'EXPENSIVE') && (
+                <Button
+                  onClick={() => {
+                    setSelectedPriceRecommendation({
+                      ...recommendation,
+                      createdAt,
+                      updatedAt,
+                    });
+                  }}
+                >
+                  Edit Price
                 </Button>
               )}
               <Button
@@ -306,9 +322,14 @@ export default function Index() {
         loading={isLoading}
       />
       <UpdateTitleModal
-        recommendation={selectedRecommendation}
+        recommendation={selectedTitleRecommendation}
         settings={data.settings}
-        onClose={() => setSelectedRecommendation(null)}
+        onClose={() => setSelectedTitleRecommendation(null)}
+      />
+      <UpdatePriceModal
+        recommendation={selectedPriceRecommendation}
+        settings={data.settings}
+        onClose={() => setSelectedPriceRecommendation(null)}
       />
       <IndexTable
         resourceName={resourceName}

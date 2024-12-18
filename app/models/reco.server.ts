@@ -7,8 +7,6 @@ import { authenticate } from "../shopify.server";
 import { getShopSettings } from "./settings.server";
 
 // NO_IMAGE -> ARCHIVE / UPLOAD_IMAGE
-// SHORT_TITLE -> UPDATE_TITLE
-// LONG_TITLE -> UPDATE_TITLE
 // SHORT_DESCRIPTION -> UPDATE_DESCRIPTION
 // LONG_DESCRIPTION -> UPDATE_DESCRIPTION
 // NO_STOCK -> ARCHIVE
@@ -270,10 +268,16 @@ export async function initializeAllProductVariants(
           shop: session.shop,
           targetType: TargetType.PRODUCT_VARIANT,
           targetId: node.id,
+          productId: node.product.id,
+          variantId: node.id,
           targetTitle: node.product.hasOnlyDefaultVariant
             ? node.product.title
             : `${node.product.title} - ${node.title}`,
-          targetUrl: getProductVariantUrlFromGid(node.product.id, node.id),
+          targetUrl: getProductVariantUrlFromGid(
+            node.product.id,
+            node.id,
+            node.product.hasOnlyDefaultVariant,
+          ),
           type: type as RecommendationType,
           status: "PENDING",
         })),
