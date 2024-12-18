@@ -5,6 +5,7 @@ import {
   Text,
   useSetIndexFiltersMode,
   Button,
+  ButtonGroup,
 } from "@shopify/polaris";
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
@@ -205,7 +206,7 @@ export default function Index() {
               Unskip
             </Button>
           ) : (
-            <>
+            <ButtonGroup>
               {(recommendation.type === 'SHORT_TITLE' ||
                 recommendation.type === 'LONG_TITLE') && (
                 <Button
@@ -248,7 +249,7 @@ export default function Index() {
               >
                 Skip
               </Button>
-            </>
+            </ButtonGroup>
           )}
         </IndexTable.Cell>
       </IndexTable.Row>

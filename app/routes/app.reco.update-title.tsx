@@ -102,6 +102,7 @@ export function UpdateTitleModal({ recommendation, settings, onClose }: UpdateTi
                 : undefined
             }
             showCharacterCount
+            multiline
           />
         </BlockStack>
       </Modal.Section>
