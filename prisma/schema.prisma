@@ -30,7 +30,6 @@ model Recommendation {
   id                  String   @id @default(auto()) @map("_id") @db.ObjectId
   shop                String
   targetType          TargetType
-  targetId            String
   productId           String?
   variantId           String?
   targetTitle         String
@@ -43,7 +42,8 @@ model Recommendation {
   // Add compound indexes for common query patterns
   @@index([shop, type, status])
   @@index([shop, targetType, status])
-  @@index([shop, targetId])
+  @@index([shop, productId])
+  @@index([shop, variantId])
   @@index([createdAt])
 }
 

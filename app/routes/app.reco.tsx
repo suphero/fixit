@@ -9,12 +9,12 @@ import {
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import { RecommendationType, type Recommendation } from "@prisma/client";
+import type { RecommendationType, Recommendation } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import {
   initializeAllProducts,
   initializeAllProductVariants,
-  getRecommendationCount,
+  getAllCounts,
   getRecommendationList,
   skipRecommendation,
 } from "../models/reco.server";
@@ -23,7 +23,7 @@ import { getShopifyAdminUrl } from "../utils/url";
 import { UpdateTitleModal } from "./app.reco.update-title";
 import { UpdatePriceModal } from "./app.reco.update-price";
 
-type RecommendationCount = Record<string, number>;
+type RecommendationCount = Record<RecommendationType, number>;
 type LoaderData = {
   shop: string;
   counts: RecommendationCount;
@@ -44,30 +44,6 @@ type LoaderData = {
   }
 };
 
-async function getAllCounts(request: Request, showSkipped: boolean) {
-  const counts = await Promise.all(
-    [
-      RecommendationType.NO_IMAGE,
-      RecommendationType.SHORT_TITLE,
-      RecommendationType.LONG_TITLE,
-      RecommendationType.SHORT_DESCRIPTION,
-      RecommendationType.LONG_DESCRIPTION,
-      RecommendationType.NO_STOCK,
-      RecommendationType.NO_COST,
-      RecommendationType.CHEAP,
-      RecommendationType.EXPENSIVE,
-      RecommendationType.LOW_DISCOUNT,
-      RecommendationType.HIGH_DISCOUNT,
-      RecommendationType.SALE_AT_LOSS,
-    ].map(async (type) => {
-      const count = await getRecommendationCount(request, type, showSkipped);
-      return [TAB_DEFINITIONS.find(tab => tab.type === type)?.id ?? '', count] as const;
-    })
-  );
-
-  return Object.fromEntries(counts);
-}
-
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const page = Number(url.searchParams.get("page") ?? "1");
@@ -76,24 +52,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const showSkipped = url.searchParams.get("showSkipped") === "true";
 
   const { session } = await authenticate.admin(request);
-  const [counts, settings] = await Promise.all([
+  const [typeCounts, settings] = await Promise.all([
     getAllCounts(request, showSkipped),
     getShopSettings(request)
   ]);
 
   let activeTab;
   if (tabId) {
-    const type = TAB_DEFINITIONS.find(tab => tab.id === tabId)?.type;
-    if (type) {
-      const [count, data] = await Promise.all([
-        getRecommendationCount(request, type, showSkipped),
-        getRecommendationList(request, type, page, size, showSkipped),
-      ]);
-      activeTab = { id: tabId, count, data };
+    const type = tabId as RecommendationType;
+    if (TAB_DEFINITIONS[type]) {
+      const data = await getRecommendationList(request, type, page, size, showSkipped);
+      activeTab = { id: type, count: typeCounts[type] ?? 0, data };
     }
   }
 
-  return { shop: session.shop, counts, settings, activeTab };
+  return { shop: session.shop, counts: typeCounts, settings, activeTab };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -117,20 +90,23 @@ export async function action({ request }: ActionFunctionArgs) {
   return { shop: session.shop, counts };
 }
 
-const TAB_DEFINITIONS = [
-  { id: "noImageProducts", content: "No Image", type: RecommendationType.NO_IMAGE },
-  { id: "shortTitleProducts", content: "Short Title", type: RecommendationType.SHORT_TITLE },
-  { id: "longTitleProducts", content: "Long Title", type: RecommendationType.LONG_TITLE },
-  { id: "shortDescriptionProducts", content: "Short Desc", type: RecommendationType.SHORT_DESCRIPTION },
-  { id: "longDescriptionProducts", content: "Long Desc", type: RecommendationType.LONG_DESCRIPTION },
-  { id: "noStockProducts", content: "No Stock", type: RecommendationType.NO_STOCK },
-  { id: "noCostProductVariants", content: "No Cost", type: RecommendationType.NO_COST },
-  { id: "saleAtLossProductVariants", content: "Sale at Loss", type: RecommendationType.SALE_AT_LOSS },
-  { id: "cheapProductVariants", content: "Cheap", type: RecommendationType.CHEAP },
-  { id: "expensiveProductVariants", content: "Expensive", type: RecommendationType.EXPENSIVE },
-  { id: "lowDiscountProductVariants", content: "Low Discount", type: RecommendationType.LOW_DISCOUNT },
-  { id: "highDiscountProductVariants", content: "High Discount", type: RecommendationType.HIGH_DISCOUNT },
-];
+const TAB_DEFINITIONS: Record<RecommendationType, string> = {
+  NO_IMAGE: "No Image",
+  SHORT_TITLE: "Short Title",
+  LONG_TITLE: "Long Title",
+  SHORT_DESCRIPTION: "Short Desc",
+  LONG_DESCRIPTION: "Long Desc",
+  NO_STOCK: "No Stock",
+  NO_COST: "No Cost",
+  SALE_AT_LOSS: "Sale at Loss",
+  CHEAP: "Cheap",
+  EXPENSIVE: "Expensive",
+  LOW_DISCOUNT: "Low Discount",
+  HIGH_DISCOUNT: "High Discount",
+  UNDERSTOCK: "Understock",
+  OVERSTOCK: "Overstock",
+  PASSIVE: "Passive",
+} as const;
 
 const PAGE_SIZE = 10;
 
@@ -144,14 +120,15 @@ export default function Index() {
   const [selectedPriceRecommendation, setSelectedPriceRecommendation] = useState<Recommendation | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
 
-  const tabs = TAB_DEFINITIONS.map((tab) => {
-    const count = (fetcher.data?.counts ?? data.counts)[tab.id] ?? 0;
-    return {
-      ...tab,
-      content: count > 0 ? `${tab.content} (${count})` : tab.content,
-      id: tab.id,
-    };
-  }).filter((tab) => (fetcher.data?.counts ?? data.counts)[tab.id] > 0);
+  const tabs = Object.entries(TAB_DEFINITIONS)
+    .map(([type, content]) => {
+      const count = (fetcher.data?.counts ?? data.counts)[type as RecommendationType] ?? 0;
+      return {
+        content: count > 0 ? `${content} (${count})` : content,
+        id: type,
+      };
+    })
+    .filter((tab) => (fetcher.data?.counts ?? data.counts)[tab.id as RecommendationType] > 0);
 
   useEffect(() => {
     if (tabs.length > 0) {

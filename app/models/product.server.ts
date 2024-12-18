@@ -41,7 +41,7 @@ export async function updateTitle(
     {
       variables: {
         input: {
-          id: recommendation.targetId,
+          id: recommendation.productId,
           title: newTitle,
         },
       },

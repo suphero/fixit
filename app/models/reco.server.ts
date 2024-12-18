@@ -123,14 +123,14 @@ export async function initializeAllProducts(
       status: 'IGNORED',
     },
     select: {
-      targetId: true,
+      productId: true,
       type: true,
     },
   });
 
   // Create a Set for quick lookup
   const ignoredSet = new Set(
-    ignoredRecommendations.map((rec) => `${rec.targetId}-${rec.type}`),
+    ignoredRecommendations.map((rec) => `${rec.productId}-${rec.type}`),
   );
 
   // Delete only pending recommendations
@@ -184,7 +184,7 @@ export async function initializeAllProducts(
         .map(([type]) => ({
           shop: session.shop,
           targetType: TargetType.PRODUCT,
-          targetId: node.id,
+          productId: node.id,
           targetTitle: node.title,
           targetUrl: getProductUrlFromGid(node.id),
           type: type as RecommendationType,
@@ -267,7 +267,6 @@ export async function initializeAllProductVariants(
         .map(([type]) => ({
           shop: session.shop,
           targetType: TargetType.PRODUCT_VARIANT,
-          targetId: node.id,
           productId: node.product.id,
           variantId: node.id,
           targetTitle: node.product.hasOnlyDefaultVariant
@@ -294,19 +293,25 @@ export async function initializeAllProductVariants(
   }
 }
 
-export async function getRecommendationCount(
+export async function getAllCounts(
   request: Request,
-  type: RecommendationType,
-  includeSkipped = false,
-) {
+  includeSkipped = false
+): Promise<Record<RecommendationType, number>> {
   const { session } = await authenticate.admin(request);
-  return prisma.recommendation.count({
+
+  const recommendations = await db.recommendation.groupBy({
+    by: ['type'],
     where: {
       shop: session.shop,
-      type,
       status: includeSkipped ? { in: ["PENDING", "IGNORED"] } : "PENDING",
     },
+    _count: true,
   });
+
+  return recommendations.reduce((acc, { type, _count }) => ({
+    ...acc,
+    [type]: _count,
+  }), {} as Record<RecommendationType, number>);
 }
 
 export async function getRecommendationList(
@@ -374,7 +379,7 @@ export async function updateProductTitle(
     {
       variables: {
         input: {
-          id: recommendation.targetId,
+          id: recommendation.productId,
           title: newTitle,
         },
       },

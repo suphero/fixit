@@ -48,7 +48,7 @@ export function UpdatePriceModal({ recommendation, settings, onClose }: UpdatePr
 
   useEffect(() => {
     if (recommendation) {
-      detailsFetcher.load(`/app/reco/update-price?variantId=${recommendation.targetId}`);
+      detailsFetcher.load(`/app/reco/update-price?variantId=${recommendation.variantId}`);
     }
   }, [recommendation]);
 
