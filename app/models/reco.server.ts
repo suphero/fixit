@@ -145,15 +145,13 @@ export async function initializeAllProducts(
     },
     select: {
       targetId: true,
-      recommendationType: true,
+      type: true,
     },
   });
 
   // Create a Set for quick lookup
   const ignoredSet = new Set(
-    ignoredRecommendations.map(
-      rec => `${rec.targetId}-${rec.recommendationType}`
-    )
+    ignoredRecommendations.map((rec) => `${rec.targetId}-${rec.type}`),
   );
 
   // Delete only pending recommendations
@@ -210,7 +208,7 @@ export async function initializeAllProducts(
           targetId: node.id,
           targetTitle: node.title,
           targetUrl: getProductUrlFromGid(node.id),
-          recommendationType: type as RecommendationType,
+          type: type as RecommendationType,
           status: "PENDING",
         })),
     );
@@ -295,7 +293,7 @@ export async function initializeAllProductVariants(
             ? node.product.title
             : `${node.product.title} - ${node.title}`,
           targetUrl: getProductVariantUrlFromGid(node.product.id, node.id),
-          recommendationType: type as RecommendationType,
+          type: type as RecommendationType,
           status: "PENDING",
         })),
     );
@@ -313,27 +311,25 @@ export async function initializeAllProductVariants(
 
 export async function getRecommendationCount(
   request: Request,
-  recommendationType: RecommendationType,
-  includeSkipped = false
+  type: RecommendationType,
+  includeSkipped = false,
 ) {
   const { session } = await authenticate.admin(request);
   return prisma.recommendation.count({
     where: {
       shop: session.shop,
-      recommendationType,
-      status: includeSkipped
-        ? { in: ['PENDING', 'IGNORED'] }
-        : 'PENDING'
+      type,
+      status: includeSkipped ? { in: ["PENDING", "IGNORED"] } : "PENDING",
     },
   });
 }
 
 export async function getRecommendationList(
   request: Request,
-  recommendationType: RecommendationType,
+  type: RecommendationType,
   page: number,
   size: number,
-  includeSkipped = false
+  includeSkipped = false,
 ) {
   const { session } = await authenticate.admin(request);
   const skip = (page - 1) * size;
@@ -342,10 +338,8 @@ export async function getRecommendationList(
   return prisma.recommendation.findMany({
     where: {
       shop: session.shop,
-      recommendationType,
-      status: includeSkipped
-        ? { in: ['PENDING', 'IGNORED'] }
-        : 'PENDING'
+      type,
+      status: includeSkipped ? { in: ["PENDING", "IGNORED"] } : "PENDING",
     },
     skip,
     take,

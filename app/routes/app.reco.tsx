@@ -227,8 +227,8 @@ export default function Index() {
             </Button>
           ) : (
             <>
-              {(recommendation.recommendationType === 'SHORT_TITLE' ||
-                recommendation.recommendationType === 'LONG_TITLE') && (
+              {(recommendation.type === 'SHORT_TITLE' ||
+                recommendation.type === 'LONG_TITLE') && (
                 <Button
                   onClick={() => {
                     setSelectedRecommendation({
