@@ -27,7 +27,7 @@ export function UpdateTitleModal({ recommendation, settings, onClose }: UpdateTi
   const fetcher = useFetcher<typeof action>();
   const [newTitle, setNewTitle] = useState('');
   const [updateError, setUpdateError] = useState('');
-
+  const isTitleValid = newTitle.length >= settings.shortTitleLength && newTitle.length <= settings.longTitleLength;
   useEffect(() => {
     setNewTitle(recommendation?.targetTitle ?? '');
   }, [recommendation]);
@@ -71,6 +71,7 @@ export function UpdateTitleModal({ recommendation, settings, onClose }: UpdateTi
         content: 'Update',
         onAction: handleUpdateTitle,
         loading: fetcher.state === 'submitting',
+        disabled: !isTitleValid,
       }}
       secondaryActions={[
         {
@@ -96,7 +97,7 @@ export function UpdateTitleModal({ recommendation, settings, onClose }: UpdateTi
             autoComplete="off"
             error={getErrorMessage(newTitle.length, settings)}
             helpText={
-              newTitle.length >= settings.shortTitleLength && newTitle.length <= settings.longTitleLength
+              isTitleValid
                 ? `Title length should be between ${settings.shortTitleLength} and ${settings.longTitleLength} characters`
                 : undefined
             }

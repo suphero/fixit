@@ -69,6 +69,7 @@ export function UpdatePriceModal({ recommendation, settings, onClose }: UpdatePr
   const { cost, minPrice, maxPrice, currentPrice } = detailsFetcher.data;
   const minRevenue = (settings.minRevenueRate * 100).toFixed(0);
   const maxRevenue = (settings.maxRevenueRate * 100).toFixed(0);
+  const isPriceValid = Number(newPrice) >= minPrice && Number(newPrice) <= maxPrice;
 
   return (
     <Modal
@@ -91,6 +92,7 @@ export function UpdatePriceModal({ recommendation, settings, onClose }: UpdatePr
           );
         },
         loading: submitFetcher.state === 'submitting',
+        disabled: !isPriceValid,
       }}
       secondaryActions={[
         {
@@ -121,7 +123,7 @@ export function UpdatePriceModal({ recommendation, settings, onClose }: UpdatePr
             autoComplete="off"
             error={getPriceErrorMessage(Number(newPrice), minPrice, maxPrice, minRevenue, maxRevenue)}
             helpText={
-              Number(newPrice) >= minPrice && Number(newPrice) <= maxPrice
+              isPriceValid
                 ? `Price should be between ${minPrice} and ${maxPrice} for ${minRevenue}% and ${maxRevenue}% revenue`
                 : undefined
             }
