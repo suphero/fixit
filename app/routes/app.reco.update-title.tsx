@@ -1,0 +1,96 @@
+import { Modal, Banner, TextField } from "@shopify/polaris";
+import type { Recommendation } from "@prisma/client";
+import { useFetcher } from "@remix-run/react";
+import { useState, useEffect } from "react";
+import type { ActionFunctionArgs } from "@remix-run/node";
+import { updateProductTitle } from "../models/reco.server";
+
+interface UpdateTitleModalProps {
+  recommendation: Recommendation | null;
+  settings: {
+    shortTitleLength: number;
+    longTitleLength: number;
+  };
+  onClose: () => void;
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const recommendationId = formData.get('recommendationId') as string;
+  const newTitle = formData.get('newTitle') as string;
+
+  await updateProductTitle(request, recommendationId, newTitle);
+  return { success: true };
+}
+
+export function UpdateTitleModal({ recommendation, settings, onClose }: UpdateTitleModalProps) {
+  const fetcher = useFetcher<typeof action>();
+  const [newTitle, setNewTitle] = useState('');
+  const [updateError, setUpdateError] = useState('');
+
+  useEffect(() => {
+    setNewTitle(recommendation?.targetTitle ?? '');
+  }, [recommendation]);
+
+  useEffect(() => {
+    if (fetcher.state === 'idle' && fetcher.data?.success) {
+      onClose();
+    }
+  }, [fetcher.state, fetcher.data]);
+
+  const handleUpdateTitle = () => {
+    setUpdateError('');
+    fetcher.submit(
+      {
+        recommendationId: recommendation?.id ?? '',
+        newTitle,
+      },
+      {
+        method: 'post',
+        action: '/app/reco/update-title'
+      }
+    );
+  };
+
+  return (
+    <Modal
+      open={recommendation !== null}
+      onClose={onClose}
+      title="Update Product Title"
+      primaryAction={{
+        content: 'Update',
+        onAction: handleUpdateTitle,
+        loading: fetcher.state === 'submitting',
+      }}
+      secondaryActions={[
+        {
+          content: 'Cancel',
+          onAction: onClose,
+        },
+      ]}
+    >
+      <Modal.Section>
+        {updateError && (
+          <Banner tone="critical">
+            {updateError}
+          </Banner>
+        )}
+        <TextField
+          label="New Title"
+          value={newTitle}
+          onChange={setNewTitle}
+          autoComplete="off"
+          error={
+            newTitle.length < settings.shortTitleLength
+              ? `Title must be at least ${settings.shortTitleLength} characters`
+              : newTitle.length > settings.longTitleLength
+              ? `Title must not exceed ${settings.longTitleLength} characters`
+              : undefined
+          }
+          helpText={`Title length should be between ${settings.shortTitleLength} and ${settings.longTitleLength} characters`}
+          showCharacterCount
+        />
+      </Modal.Section>
+    </Modal>
+  );
+}

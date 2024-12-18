@@ -4,9 +4,6 @@ import {
   IndexFilters,
   Text,
   useSetIndexFiltersMode,
-  Modal,
-  TextField,
-  Banner,
   Button,
 } from "@shopify/polaris";
 import { useState, useEffect } from "react";
@@ -19,11 +16,11 @@ import {
   initializeAllProductVariants,
   getRecommendationCount,
   getRecommendationList,
-  updateProductTitle,
   getShopSettings,
   skipRecommendation,
 } from "../models/reco.server";
 import { getShopifyAdminUrl } from "../utils/url";
+import { UpdateTitleModal } from "./app.reco.update-title";
 
 type RecommendationCount = Record<string, number>;
 type LoaderData = {
@@ -104,15 +101,6 @@ export async function action({ request }: ActionFunctionArgs) {
   const action = formData.get('action');
   const showSkipped = formData.get('showSkipped') === 'true';
 
-  if (action === 'updateTitle') {
-    const recommendationId = formData.get('recommendationId') as string;
-    const newTitle = formData.get('newTitle') as string;
-    await updateProductTitle(request, recommendationId, newTitle);
-
-    const counts = await getAllCounts(request, showSkipped);
-    return { shop: session.shop, counts };
-  }
-
   if (action === 'skip') {
     const recommendationId = formData.get('recommendationId') as string;
     await skipRecommendation(request, recommendationId);
@@ -152,8 +140,6 @@ export default function Index() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [page, setPage] = useState(1);
   const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
-  const [newTitle, setNewTitle] = useState('');
-  const [updateError, setUpdateError] = useState('');
   const [showSkipped, setShowSkipped] = useState(false);
 
   const tabs = TAB_DEFINITIONS.filter((tab) =>
@@ -196,30 +182,6 @@ export default function Index() {
 
   const truncate = (str: string, length = 50) =>
     str?.length > length ? str.slice(0, length) + "…" : str || "";
-
-  const handleUpdateTitle = async () => {
-    try {
-      setUpdateError('');
-      await fetcher.submit(
-        {
-          recommendationId: selectedRecommendation?.id ?? '',
-          newTitle,
-          action: 'updateTitle',
-        },
-        { method: 'post' }
-      );
-      setSelectedRecommendation(null);
-      setNewTitle('');
-    } catch (error: any) {
-      setUpdateError(error.message);
-    }
-  };
-
-  const handleModalClose = () => {
-    setSelectedRecommendation(null);
-    setNewTitle('');
-    setUpdateError('');
-  };
 
   const rowMarkup = recommendations.map((recommendation, index) => {
     const createdAt = new Date(recommendation.createdAt);
@@ -269,7 +231,6 @@ export default function Index() {
                       createdAt,
                       updatedAt,
                     });
-                    setNewTitle(recommendation.targetTitle);
                   }}
                 >
                   Edit Title
@@ -339,45 +300,11 @@ export default function Index() {
         hideQueryField
         loading={isLoading}
       />
-      <Modal
-        open={selectedRecommendation !== null}
-        onClose={handleModalClose}
-        title="Update Product Title"
-        primaryAction={{
-          content: 'Update',
-          onAction: handleUpdateTitle,
-          loading: fetcher.state === 'submitting',
-        }}
-        secondaryActions={[
-          {
-            content: 'Cancel',
-            onAction: handleModalClose,
-          },
-        ]}
-      >
-        <Modal.Section>
-          {updateError && (
-            <Banner tone="critical">
-              {updateError}
-            </Banner>
-          )}
-          <TextField
-            label="New Title"
-            value={newTitle}
-            onChange={setNewTitle}
-            autoComplete="off"
-            error={
-              newTitle.length < data.settings.shortTitleLength
-                ? `Title must be at least ${data.settings.shortTitleLength} characters`
-                : newTitle.length > data.settings.longTitleLength
-                ? `Title must not exceed ${data.settings.longTitleLength} characters`
-                : undefined
-            }
-            helpText={`Title length should be between ${data.settings.shortTitleLength} and ${data.settings.longTitleLength} characters`}
-            showCharacterCount
-          />
-        </Modal.Section>
-      </Modal>
+      <UpdateTitleModal
+        recommendation={selectedRecommendation}
+        settings={data.settings}
+        onClose={() => setSelectedRecommendation(null)}
+      />
       <IndexTable
         resourceName={resourceName}
         itemCount={totalCount}
