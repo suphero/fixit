@@ -38,6 +38,12 @@ model Recommendation {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   userActionRequired  Boolean  @default(false)
+
+  // Add compound indexes for common query patterns
+  @@index([shop, recommendationType, status])
+  @@index([shop, targetType, status])
+  @@index([shop, targetId])
+  @@index([createdAt])
 }
 
 enum TargetType {

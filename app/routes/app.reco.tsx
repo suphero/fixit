@@ -142,9 +142,14 @@ export default function Index() {
   const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
 
-  const tabs = TAB_DEFINITIONS.filter((tab) =>
-    (fetcher.data?.counts ?? data.counts)[tab.id] > 0
-  );
+  const tabs = TAB_DEFINITIONS.map((tab) => {
+    const count = (fetcher.data?.counts ?? data.counts)[tab.id] ?? 0;
+    return {
+      ...tab,
+      content: count > 0 ? `${tab.content} (${count})` : tab.content,
+      id: tab.id,
+    };
+  }).filter((tab) => (fetcher.data?.counts ?? data.counts)[tab.id] > 0);
 
   useEffect(() => {
     if (tabs.length > 0) {
@@ -314,6 +319,7 @@ export default function Index() {
           { title: "" },
         ]}
         loading={isLoading}
+        selectable={false}
         pagination={{
           hasPrevious: page > 1,
           onPrevious: () => handlePageChange(page - 1),
