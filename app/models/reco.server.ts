@@ -4,6 +4,7 @@ import { RecommendationStatus, TargetType } from "@prisma/client";
 import db from "../db.server";
 import { getProductUrlFromGid, getProductVariantUrlFromGid } from "../utils/url.server";
 import { authenticate } from "../shopify.server";
+import { getShopSettings } from "./settings.server";
 
 // NO_IMAGE -> ARCHIVE / UPLOAD_IMAGE
 // SHORT_TITLE -> UPDATE_TITLE
@@ -38,28 +39,8 @@ type ProductNode = {
   featuredMedia: { id: string } | null;
 };
 
-// Add function to get settings
-export async function getShopSettings(request: Request) {
-  const { session } = await authenticate.admin(request);
-  const settings = await db.settings.findFirst({
-    where: { shopId: session.shop },
-  });
-
-  // Return default settings if none exist
-  return settings ?? {
-    shortTitleLength: 10,
-    longTitleLength: 100,
-    shortDescriptionLength: 50,
-    longDescriptionLength: 500,
-    minRevenueRate: 0.2,
-    maxRevenueRate: 0.8,
-    lowDiscountRate: 0.1,
-    highDiscountRate: 0.5,
-  };
-}
-
 // Update the criteria to use settings
-const createProductRecommendationCriteria = (settings: any) => ({
+const getProductRecommendationCriteria = (settings: any) => ({
   NO_IMAGE: {
     filter: (node: ProductNode) => node.featuredMedia === null,
   },
@@ -80,7 +61,7 @@ const createProductRecommendationCriteria = (settings: any) => ({
   },
 });
 
-const createVariantRecommendationCriteria = (settings: any) => ({
+const getVariantRecommendationCriteria = (settings: any) => ({
   NO_COST: {
     filter: (node: ProductVariantNode) => node.inventoryItem?.unitCost === null,
   },
@@ -134,7 +115,7 @@ export async function initializeAllProducts(
 ) {
   const { session } = await authenticate.admin(request);
   const settings = await getShopSettings(request);
-  const PRODUCT_RECOMMENDATION_CRITERIA = createProductRecommendationCriteria(settings);
+  const criteria = getProductRecommendationCriteria(settings);
 
   // Get existing ignored recommendations
   const ignoredRecommendations = await db.recommendation.findMany({
@@ -199,7 +180,7 @@ export async function initializeAllProducts(
     } = await response.json();
 
     const recommendations = edges.flatMap(({ node }: any) =>
-      Object.entries(PRODUCT_RECOMMENDATION_CRITERIA)
+      Object.entries(criteria)
         .filter(([, config]) => config.filter(node))
         .filter(([type]) => !ignoredSet.has(`${node.id}-${type}`))
         .map(([type]) => ({
@@ -230,7 +211,7 @@ export async function initializeAllProductVariants(
 ) {
   const { session } = await authenticate.admin(request);
   const settings = await getShopSettings(request);
-  const PRODUCT_VARIANT_RECOMMENDATION_CRITERIA = createVariantRecommendationCriteria(settings);
+  const criteria = getVariantRecommendationCriteria(settings);
 
   await db.recommendation.deleteMany({
     where: {
@@ -283,7 +264,7 @@ export async function initializeAllProductVariants(
     } = await response.json();
 
     const recommendations = edges.flatMap(({ node }: any) =>
-      Object.entries(PRODUCT_VARIANT_RECOMMENDATION_CRITERIA)
+      Object.entries(criteria)
         .filter(([, config]) => config.filter(node))
         .map(([type]) => ({
           shop: session.shop,

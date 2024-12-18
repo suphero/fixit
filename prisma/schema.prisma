@@ -76,7 +76,7 @@ enum RecommendationStatus {
 
 model Settings {
   id                      String   @id @default(auto()) @map("_id") @db.ObjectId
-  shopId                  String
+  shop                    String   @unique
   understockDays          Int      @default(3)
   overstockDays           Int      @default(30)
   minRevenueRate          Float    @default(0.2)

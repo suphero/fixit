@@ -16,9 +16,9 @@ import {
   initializeAllProductVariants,
   getRecommendationCount,
   getRecommendationList,
-  getShopSettings,
   skipRecommendation,
 } from "../models/reco.server";
+import { getShopSettings } from "../models/settings.server";
 import { getShopifyAdminUrl } from "../utils/url";
 import { UpdateTitleModal } from "./app.reco.update-title";
 
