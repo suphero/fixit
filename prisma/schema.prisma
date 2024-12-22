@@ -35,7 +35,7 @@ model Recommendation {
   targetTitle         String
   targetUrl           String
   type                RecommendationType
-  subType             RecommendationSubType
+  subTypes            RecommendationSubType[]
   status              RecommendationStatus @default(PENDING)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -85,7 +85,6 @@ enum RecommendationSubType {
 enum RecommendationStatus {
   PENDING
   RESOLVED
-  IGNORED
 }
 
 model Settings {

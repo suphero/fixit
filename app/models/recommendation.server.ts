@@ -3,7 +3,7 @@ import {
   RecommendationStatus,
   TargetType,
 } from "@prisma/client";
-import type { Recommendation } from "@prisma/client";
+import type { Recommendation, RecommendationSubType, Settings, Prisma } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import { getShopSettings } from "./settings.server";
 import {
@@ -13,6 +13,7 @@ import {
 import db from "../db.server";
 import * as product from "./product.server";
 import * as variant from "./variant.server";
+import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 
 type ProductVariantNode = {
   id: string;
@@ -37,43 +38,11 @@ type ProductNode = {
   featuredMedia: { id: string } | null;
 };
 
-const getProductRecommendationCriteria = (settings: any) => ({
-  NO_IMAGE: {
-    type: RecommendationType.DEFINITION,
-    filter: (node: ProductNode) => node.featuredMedia === null,
-  },
-  SHORT_TITLE: {
-    type: RecommendationType.DEFINITION,
-    filter: (node: ProductNode) =>
-      node.title.length < settings.shortTitleLength,
-  },
-  LONG_TITLE: {
-    type: RecommendationType.DEFINITION,
-    filter: (node: ProductNode) => node.title.length > settings.longTitleLength,
-  },
-  SHORT_DESCRIPTION: {
-    type: RecommendationType.DEFINITION,
-    filter: (node: ProductNode) =>
-      node.description.length < settings.shortDescriptionLength,
-  },
-  LONG_DESCRIPTION: {
-    type: RecommendationType.DEFINITION,
-    filter: (node: ProductNode) =>
-      node.description.length > settings.longDescriptionLength,
-  },
-  NO_STOCK: {
-    type: RecommendationType.STOCK,
-    filter: (node: ProductNode) => node.totalInventory === 0,
-  },
-});
-
-const getVariantRecommendationCriteria = (settings: any) => ({
+const getPricingCriteria = (settings: Settings) => ({
   NO_COST: {
-    type: RecommendationType.PRICING,
     filter: (node: ProductVariantNode) => node.inventoryItem?.unitCost === null,
   },
   SALE_AT_LOSS: {
-    type: RecommendationType.PRICING,
     filter: (node: ProductVariantNode) => {
       const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
       const price = Number(node.price ?? 0);
@@ -82,7 +51,6 @@ const getVariantRecommendationCriteria = (settings: any) => ({
     },
   },
   CHEAP: {
-    type: RecommendationType.PRICING,
     filter: (node: ProductVariantNode) => {
       const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
       const price = Number(node.price ?? 0);
@@ -91,7 +59,6 @@ const getVariantRecommendationCriteria = (settings: any) => ({
     },
   },
   EXPENSIVE: {
-    type: RecommendationType.PRICING,
     filter: (node: ProductVariantNode) => {
       const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
       const price = Number(node.price ?? 0);
@@ -100,7 +67,6 @@ const getVariantRecommendationCriteria = (settings: any) => ({
     },
   },
   LOW_DISCOUNT: {
-    type: RecommendationType.PRICING,
     filter: (node: ProductVariantNode) => {
       const price = Number(node.price ?? 0);
       const compareAtPrice = Number(node.compareAtPrice ?? 0);
@@ -115,7 +81,6 @@ const getVariantRecommendationCriteria = (settings: any) => ({
     },
   },
   HIGH_DISCOUNT: {
-    type: RecommendationType.PRICING,
     filter: (node: ProductVariantNode) => {
       const price = Number(node.price ?? 0);
       const compareAtPrice = Number(node.compareAtPrice ?? 0);
@@ -128,13 +93,37 @@ const getVariantRecommendationCriteria = (settings: any) => ({
   },
 });
 
-async function findRecommendation(
-  request: Request,
-  recommendationId: string,
-) {
-  const { session } = await authenticate.admin(request);
+const getDefinitionCriteria = (settings: Settings) => ({
+  NO_IMAGE: {
+    filter: (node: ProductNode) => node.featuredMedia === null,
+  },
+  SHORT_TITLE: {
+    filter: (node: ProductNode) =>
+      node.title.length < settings.shortTitleLength,
+  },
+  LONG_TITLE: {
+    filter: (node: ProductNode) => node.title.length > settings.longTitleLength,
+  },
+  SHORT_DESCRIPTION: {
+    filter: (node: ProductNode) =>
+      node.description.length < settings.shortDescriptionLength,
+  },
+  LONG_DESCRIPTION: {
+    filter: (node: ProductNode) =>
+      node.description.length > settings.longDescriptionLength,
+  }
+});
+
+const getStockCriteria = (_settings: Settings) => ({
+  NO_STOCK: {
+    type: RecommendationType.STOCK,
+    filter: (node: ProductNode) => node.totalInventory === 0,
+  }
+});
+
+function findRecommendation(shop: string, id: string) {
   return db.recommendation.findFirst({
-    where: { id: recommendationId, shop: session.shop },
+    where: { id, shop },
   });
 }
 
@@ -152,152 +141,118 @@ async function updateRecommendationStatus(
   });
 }
 
-async function createRecommendations(
-  recommendations: Omit<Recommendation, "id" | "createdAt" | "updatedAt">[],
-) {
-  return db.recommendation.createMany({
-    data: recommendations,
-  });
-}
-
-async function deleteRecommendations(
+async function getProductRecommendations(
   shop: string,
-  status: RecommendationStatus,
-  targetType: TargetType
+  graphql: AdminGraphqlClient,
+  settings: Settings,
 ) {
-  return db.recommendation.deleteMany({
-    where: {
-      shop,
-      status,
-      targetType
-    },
-  });
-}
-
-async function getIgnoredRecommendations(
-  shop: string,
-  targetType: TargetType,
-) {
-  return db.recommendation.findMany({
-    where: {
-      shop,
-      targetType,
-      status: "IGNORED",
-    },
-    select: {
-      productId: true,
-      type: true,
-    },
-  });
-}
-
-async function initializeAllProducts(
-  request: Request
-) {
-  const { admin, session } = await authenticate.admin(request);
-  const settings = await getShopSettings(request);
-  const criteria = getProductRecommendationCriteria(settings);
-
-  const ignoredRecommendations = await getIgnoredRecommendations(
-    session.shop,
-    TargetType.PRODUCT,
-  );
-  const ignoredSet = new Set(
-    ignoredRecommendations.map((rec) => `${rec.productId}-${rec.type}`),
-  );
-
-  await deleteRecommendations(
-    session.shop,
-    RecommendationStatus.PENDING,
-    TargetType.PRODUCT,
-  );
-
+  const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
   let cursor = null;
 
   while (hasNextPage) {
-    const { edges, pageInfo } = await product.fetch(admin.graphql, cursor);
+    const { edges, pageInfo } = await product.fetch(graphql, cursor);
 
-    const recommendations = edges.flatMap(({ node }: { node: ProductNode }) =>
-      Object.entries(criteria)
-        .filter(([, config]) => config.filter(node))
-        .filter(([subType]) => !ignoredSet.has(`${node.id}-${subType}`))
-        .map(([subType, config]) => ({
-          shop: session.shop,
+    for (const { node } of edges) {
+      // Check definition issues
+      const definitionIssues = Object.entries(getDefinitionCriteria(settings))
+        .filter(([, criteria]) => criteria.filter(node))
+        .map(([subType]) => subType as RecommendationSubType);
+
+      if (definitionIssues.length > 0) {
+        recommendations.push({
+          shop,
           targetType: TargetType.PRODUCT,
           productId: node.id,
+          variantId: null,
           targetTitle: node.title,
           targetUrl: getProductUrlFromGid(node.id),
-          type: config.type,
-          subType,
+          type: RecommendationType.DEFINITION,
+          subTypes: definitionIssues,
           status: RecommendationStatus.PENDING,
-        })),
-    );
+        });
+      }
 
-    if (recommendations.length > 0) {
-      await createRecommendations(recommendations);
+      // Check stock issues
+      const stockIssues = Object.entries(getStockCriteria(settings))
+        .filter(([, criteria]) => criteria.filter(node))
+        .map(([subType]) => subType as RecommendationSubType);
+
+      if (stockIssues.length > 0) {
+        recommendations.push({
+          shop,
+          targetType: TargetType.PRODUCT,
+          productId: node.id,
+          variantId: null,
+          targetTitle: node.title,
+          targetUrl: getProductUrlFromGid(node.id),
+          type: RecommendationType.STOCK,
+          subTypes: stockIssues,
+          status: RecommendationStatus.PENDING,
+        });
+      }
     }
 
     hasNextPage = pageInfo.hasNextPage;
     cursor = hasNextPage ? edges[edges.length - 1].cursor : null;
   }
+
+  return recommendations;
 }
 
-async function initializeAllProductVariants(
-  request: Request
+async function getProductVariantRecommendations(
+  shop: string,
+  graphql: AdminGraphqlClient,
+  settings: Settings,
 ) {
-  const { admin, session } = await authenticate.admin(request);
-  const settings = await getShopSettings(request);
-  const criteria = getVariantRecommendationCriteria(settings);
-
-  await deleteRecommendations(
-    session.shop,
-    RecommendationStatus.PENDING,
-    TargetType.PRODUCT_VARIANT,
-  );
-
+  const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
   let cursor = null;
 
   while (hasNextPage) {
-    const { edges, pageInfo } = await variant.fetch(admin.graphql, cursor);
+    const { edges, pageInfo } = await variant.fetch(graphql, cursor);
 
-    const recommendations = edges.flatMap(
-      ({ node }: { node: ProductVariantNode }) =>
-        Object.entries(criteria)
-          .filter(([, config]) => config.filter(node))
-          .map(([subType, config]) => ({
-            shop: session.shop,
-            targetType: TargetType.PRODUCT_VARIANT,
-            productId: node.product.id,
-            variantId: node.id,
-            targetTitle: node.product.hasOnlyDefaultVariant
-              ? node.product.title
-              : `${node.product.title} - ${node.title}`,
-            targetUrl: getProductVariantUrlFromGid(
-              node.product.id,
-              node.id,
-              node.product.hasOnlyDefaultVariant,
-            ),
-            type: config.type,
-            subType,
-            status: RecommendationStatus.PENDING,
-          })),
-    );
+    for (const { node } of edges) {
+      // Check pricing issues
+      const pricingIssues = Object.entries(getPricingCriteria(settings))
+        .filter(([, criteria]) => criteria.filter(node))
+        .map(([subType]) => subType as RecommendationSubType);
 
-    if (recommendations.length > 0) {
-      await createRecommendations(recommendations);
+      if (pricingIssues.length > 0) {
+        const isVariantDefault = node.product.hasOnlyDefaultVariant;
+        recommendations.push({
+          shop,
+          targetType: isVariantDefault
+            ? TargetType.PRODUCT
+            : TargetType.PRODUCT_VARIANT,
+          productId: node.product.id,
+          variantId: node.id,
+          targetTitle: isVariantDefault
+            ? node.product.title
+            : `${node.product.title} - ${node.title}`,
+          targetUrl: getProductVariantUrlFromGid(
+            node.product.id,
+            node.id,
+            isVariantDefault,
+          ),
+          type: RecommendationType.PRICING,
+          subTypes: pricingIssues,
+          status: RecommendationStatus.PENDING,
+        });
+      }
     }
 
     hasNextPage = pageInfo.hasNextPage;
     cursor = hasNextPage ? edges[edges.length - 1].cursor : null;
   }
+
+  return recommendations;
 }
 
 export async function getRecommendationsByType(
   request: Request,
   type: RecommendationType,
-  status: RecommendationStatus | RecommendationStatus[],
+  status: RecommendationStatus,
   page: number,
   size: number,
 ) {
@@ -307,7 +262,7 @@ export async function getRecommendationsByType(
     where: {
       shop: session.shop,
       type,
-      status: Array.isArray(status) ? { in: status } : status,
+      status,
     },
     skip,
     take: size,
@@ -317,14 +272,14 @@ export async function getRecommendationsByType(
 
 export async function getRecommendationCounts(
   request: Request,
-  status: RecommendationStatus | RecommendationStatus[],
+  status: RecommendationStatus,
 ): Promise<Record<RecommendationType, number>> {
   const { session } = await authenticate.admin(request);
   const recommendations = await db.recommendation.groupBy({
     by: ["type"],
     where: {
       shop: session.shop,
-      status: Array.isArray(status) ? { in: status } : status,
+      status,
     },
     _count: true,
   });
@@ -338,41 +293,24 @@ export async function getRecommendationCounts(
   );
 }
 
-export async function skipRecommendation(
-  request: Request,
-  recommendationId: string,
-) {
-  const recommendation = await findRecommendation(request, recommendationId);
-
-  if (!recommendation) {
-    throw new Error("Recommendation not found");
-  }
-
-  return updateRecommendationStatus(
-    recommendationId,
-    RecommendationStatus.IGNORED,
-  );
-}
-
-export async function unskipRecommendation(
-  request: Request,
-  recommendationId: string,
-) {
-  const recommendation = await findRecommendation(request, recommendationId);
-
-  if (!recommendation) {
-    throw new Error("Recommendation not found");
-  }
-
-  return updateRecommendationStatus(
-    recommendationId,
-    RecommendationStatus.PENDING,
-  );
-}
-
 export async function initializeAll(request: Request) {
-  await initializeAllProducts(request);
-  await initializeAllProductVariants(request);
+  const { admin, session } = await authenticate.admin(request);
+  const settings = await getShopSettings(request);
+
+  const recommendations: Prisma.RecommendationCreateManyInput[] = [];
+  const productReco = await getProductRecommendations(session.shop, admin.graphql, settings);
+  const variantReco = await getProductVariantRecommendations(session.shop, admin.graphql, settings);
+  recommendations.push(...productReco, ...variantReco);
+
+  await db.recommendation.deleteMany({
+    where: {
+      shop: session.shop,
+      status: RecommendationStatus.PENDING,
+    },
+  });
+  if (recommendations.length > 0) {
+    await db.recommendation.createMany({ data: recommendations });
+  }
 }
 
 export async function updateTitle(
@@ -380,10 +318,10 @@ export async function updateTitle(
   recommendationId: string,
   newTitle: string,
 ) {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const settings = await getShopSettings(request);
 
-  const recommendation = await findRecommendation(request, recommendationId);
+  const recommendation = await findRecommendation(session.shop, recommendationId);
   if (!recommendation) throw new Error("Recommendation not found");
   if (!recommendation.productId) {
     throw new Error("Product not found");
@@ -411,9 +349,12 @@ export async function archiveOrDelete(
   request: Request,
   recommendationId: string,
 ) {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
 
-  const recommendation = await findRecommendation(request, recommendationId);
+  const recommendation = await findRecommendation(
+    session.shop,
+    recommendationId,
+  );
   if (!recommendation) throw new Error("Recommendation not found");
   if (!recommendation.productId) {
     throw new Error("Product not found");
@@ -450,10 +391,13 @@ export async function updateDescription(
   recommendationId: string,
   newDescription: string,
 ) {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const settings = await getShopSettings(request);
 
-  const recommendation = await findRecommendation(request, recommendationId);
+  const recommendation = await findRecommendation(
+    session.shop,
+    recommendationId,
+  );
   if (!recommendation) throw new Error("Recommendation not found");
 
   if (!recommendation.productId) {
@@ -478,9 +422,9 @@ export async function updateDescription(
 }
 
 interface PricingUpdate {
-  cost: number;
-  price: number;
-  compareAtPrice?: number;
+  cost?: string;
+  price?: string;
+  compareAtPrice?: string;
 }
 
 export async function updatePricing(
@@ -488,8 +432,11 @@ export async function updatePricing(
   recommendationId: string,
   { cost, price, compareAtPrice }: PricingUpdate,
 ) {
-  const { admin } = await authenticate.admin(request);
-  const recommendation = await findRecommendation(request, recommendationId);
+  const { admin, session } = await authenticate.admin(request);
+  const recommendation = await findRecommendation(
+    session.shop,
+    recommendationId,
+  );
   if (!recommendation) throw new Error("Recommendation not found");
   if (!recommendation.productId) {
     throw new Error("Product not found");

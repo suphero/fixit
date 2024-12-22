@@ -22,9 +22,9 @@ export async function getDetails(request: Request, variantId: string) {
   );
 
   const { data } = await response.json();
-  const cost = Number(data.productVariant.inventoryItem?.unitCost?.amount ?? 0);
-  const currentPrice = Number(data.productVariant.price);
-  const currentCompareAtPrice = Number(data.productVariant.compareAtPrice ?? 0);
+  const cost = data.productVariant.inventoryItem?.unitCost?.amount;
+  const currentPrice = data.productVariant.price;
+  const currentCompareAtPrice = data.productVariant.compareAtPrice;
 
   return {
     cost,
@@ -73,9 +73,9 @@ export function updatePricing(
   graphql: AdminGraphqlClient,
   productId: string,
   variantId: string,
-  price: number,
-  cost: number,
-  compareAtPrice?: number,
+  price?: string,
+  cost?: string,
+  compareAtPrice?: string,
 ) {
   return graphql(
     `
@@ -102,10 +102,10 @@ export function updatePricing(
         variants: [
           {
             id: variantId,
-            price: String(price),
-            compareAtPrice: compareAtPrice ? String(compareAtPrice) : null,
+            price,
+            compareAtPrice,
             inventoryItem: {
-              cost: String(cost),
+              cost,
             },
           },
         ],

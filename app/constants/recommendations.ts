@@ -1,4 +1,4 @@
-import type { RecommendationType } from "@prisma/client";
+import type { RecommendationType, RecommendationSubType } from "@prisma/client";
 import type { FunctionComponent, SVGProps } from "react";
 import type { Tone } from "@shopify/polaris/build/ts/src/components/Badge";
 import {
@@ -9,29 +9,6 @@ import {
   DiscountFilledIcon,
   DisabledIcon,
 } from "@shopify/polaris-icons";
-
-// Define our own SubType enum to match prisma schema
-export type RecommendationSubType =
-  // Pricing related
-  | "CHEAP"
-  | "EXPENSIVE"
-  | "NO_COST"
-  | "SALE_AT_LOSS"
-  | "LOW_DISCOUNT"
-  | "HIGH_DISCOUNT"
-
-  // Definition related
-  | "SHORT_TITLE"
-  | "LONG_TITLE"
-  | "SHORT_DESCRIPTION"
-  | "LONG_DESCRIPTION"
-  | "NO_IMAGE"
-
-  // Stock related
-  | "UNDERSTOCK"
-  | "OVERSTOCK"
-  | "NO_STOCK"
-  | "PASSIVE";
 
 interface SubTypeDefinition {
   type: RecommendationSubType;
@@ -49,7 +26,12 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
   PRICING: {
     content: "Pricing",
     subTypes: [
-      { type: "CHEAP", label: "Cheap", tone: "success", icon: DiscountIcon },
+      {
+        type: "CHEAP",
+        label: "Cheap",
+        tone: "success",
+        icon: DiscountIcon,
+      },
       {
         type: "EXPENSIVE",
         label: "Expensive",
@@ -85,9 +67,21 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
   DEFINITION: {
     content: "Content",
     subTypes: [
-      { type: "SHORT_TITLE", label: "Short Title", tone: "info" },
-      { type: "LONG_TITLE", label: "Long Title", tone: "info-strong" },
-      { type: "SHORT_DESCRIPTION", label: "Short Description", tone: "info" },
+      {
+        type: "SHORT_TITLE",
+        label: "Short Title",
+        tone: "info",
+      },
+      {
+        type: "LONG_TITLE",
+        label: "Long Title",
+        tone: "info-strong",
+      },
+      {
+        type: "SHORT_DESCRIPTION",
+        label: "Short Description",
+        tone: "info",
+      },
       {
         type: "LONG_DESCRIPTION",
         label: "Long Description",
@@ -104,20 +98,34 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
   STOCK: {
     content: "Inventory",
     subTypes: [
-      { type: "UNDERSTOCK", label: "Low Stock", tone: "warning" },
-      { type: "OVERSTOCK", label: "High Stock", tone: "attention" },
+      {
+        type: "UNDERSTOCK",
+        label: "Low Stock",
+        tone: "warning",
+      },
+      {
+        type: "OVERSTOCK",
+        label: "High Stock",
+        tone: "attention",
+      },
       {
         type: "NO_STOCK",
         label: "Out of Stock",
         tone: "critical-strong",
         icon: DisabledIcon,
       },
-      { type: "PASSIVE", label: "Inactive Product", tone: "read-only" },
+      {
+        type: "PASSIVE",
+        label: "Inactive Product",
+        tone: "read-only",
+      },
     ],
   },
 };
 
-export function getSubTypeDefinition(subType: RecommendationSubType): SubTypeDefinition {
+export function getSubTypeDefinition(
+  subType: RecommendationSubType,
+): SubTypeDefinition {
   for (const definition of Object.values(TAB_DEFINITIONS)) {
     const found = definition.subTypes.find((st) => st.type === subType);
     if (found) return found;

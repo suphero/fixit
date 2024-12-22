@@ -11,23 +11,19 @@ import {
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import type { Recommendation } from "@prisma/client";
-import { RecommendationType, RecommendationSubType, TargetType, RecommendationStatus } from "@prisma/client";
+import type { Recommendation , RecommendationSubType, RecommendationType } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import {
   initializeAll,
   getRecommendationCounts,
   getRecommendationsByType,
-  skipRecommendation,
   archiveOrDelete,
-  unskipRecommendation,
 } from "../models/recommendation.server";
 import { TAB_DEFINITIONS, getSubTypeDefinition } from "app/constants/recommendations";
 import { getShopSettings } from "../models/settings.server";
 import { getShopifyAdminUrl } from "../utils/url";
 import { UpdateTitleModal } from "./app.reco.update-title";
 import { UpdatePricingModal } from "./app.reco.update-pricing";
-import { UpdateDescriptionModal } from "./app.reco.update-description";
 
 type LoaderData = {
   shop: string;
@@ -58,18 +54,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const page = Number(url.searchParams.get("page") ?? "1");
   const size = Number(url.searchParams.get("size") ?? "10");
   const type = url.searchParams.get("type") as RecommendationType;
-  const showSkipped = url.searchParams.get("showSkipped") === "true";
 
   const { session } = await authenticate.admin(request);
-  const status = showSkipped ? [RecommendationStatus.PENDING, RecommendationStatus.IGNORED] : RecommendationStatus.PENDING;
   const [typeCounts, settings] = await Promise.all([
-    getRecommendationCounts(request, status),
+    getRecommendationCounts(request, "PENDING"),
     getShopSettings(request)
   ]);
 
   let activeTab;
   if (type && TAB_DEFINITIONS[type]) {
-    const data = await getRecommendationsByType(request, type, status, page, size);
+    const data = await getRecommendationsByType(request, type, "PENDING", page, size);
     activeTab = {
       type,
       count: typeCounts[type] ?? 0,
@@ -85,17 +79,9 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const { session } = await authenticate.admin(request);
   const action = formData.get('action');
-  const showSkipped = formData.get('showSkipped') === 'true';
-  const status = showSkipped ? [RecommendationStatus.PENDING, RecommendationStatus.IGNORED] : RecommendationStatus.PENDING;
   const recommendationId = formData.get('recommendationId') as string;
 
   switch (action) {
-    case 'skip':
-      await skipRecommendation(request, recommendationId);
-      break;
-    case 'unskip':
-      await unskipRecommendation(request, recommendationId);
-      break;
     case 'archive_delete':
       await archiveOrDelete(request, recommendationId);
       break;
@@ -106,7 +92,7 @@ export async function action({ request }: ActionFunctionArgs) {
       throw new Error(`Invalid action: ${action}`);
   }
 
-  const counts = await getRecommendationCounts(request, status);
+  const counts = await getRecommendationCounts(request, "PENDING");
   return { shop: session.shop, counts };
 }
 
@@ -118,10 +104,8 @@ export default function Index() {
   const { mode, setMode } = useSetIndexFiltersMode();
   const [selectedTab, setSelectedTab] = useState(0);
   const [page, setPage] = useState(1);
-  const [selectedTitleRecommendation, setSelectedTitleRecommendation] = useState<Recommendation | null>(null);
   const [selectedPricingRecommendation, setSelectedPricingRecommendation] = useState<Recommendation | null>(null);
-  const [selectedDescriptionRecommendation, setSelectedDescriptionRecommendation] = useState<Recommendation | null>(null);
-  const [showSkipped, setShowSkipped] = useState(false);
+  const [selectedDefinitionRecommendation, setSelectedDefinitionRecommendation] = useState<Recommendation | null>(null);
 
   const tabs = Object.entries(TAB_DEFINITIONS).map(([type, definition]) => {
     const count = (fetcher.data?.counts ?? data.counts)[type as RecommendationType] ?? 0;
@@ -133,9 +117,9 @@ export default function Index() {
 
   useEffect(() => {
     if (tabs.length > 0) {
-      fetcher.load(`/app/reco?type=${tabs[selectedTab].id}&page=${page}&size=${PAGE_SIZE}&showSkipped=${showSkipped}`);
+      fetcher.load(`/app/reco?type=${tabs[selectedTab].id}&page=${page}&size=${PAGE_SIZE}`);
     }
-  }, [tabs.length, selectedTab, page, showSkipped]);
+  }, [tabs.length, selectedTab, page]);
 
   const activeTabData = fetcher.data?.activeTab ?? data.activeTab;
   const recommendations = activeTabData?.data ?? [];
@@ -171,7 +155,10 @@ export default function Index() {
   const rowMarkup = recommendations.map((recommendation, index) => {
     const createdAt = new Date(recommendation.createdAt);
     const updatedAt = new Date(recommendation.updatedAt);
-    const subTypeLabel = getSubTypeDefinition(recommendation.subType);
+    const hasPricingIssues = recommendation.type === "PRICING";
+    const hasDefinitionIssues = recommendation.type === "DEFINITION";
+    const hasStockIssues = recommendation.type === "STOCK";
+
     return (
       <IndexTable.Row
         id={recommendation.id}
@@ -189,53 +176,43 @@ export default function Index() {
           </Button>
         </IndexTable.Cell>
         <IndexTable.Cell>
-          <Badge icon={subTypeLabel.icon} tone={subTypeLabel.tone}>
-            {subTypeLabel.label}
-          </Badge>
+          {recommendation.targetType === "PRODUCT" ? "Product" : "Variant"}
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          {recommendation.subTypes.map(subType => {
+            const subTypeLabel = getSubTypeDefinition(subType);
+            return (
+              <Badge key={subType} icon={subTypeLabel.icon} tone={subTypeLabel.tone}>
+                {subTypeLabel.label}
+              </Badge>
+            );
+          })}
         </IndexTable.Cell>
         <IndexTable.Cell>
           {createdAt.toLocaleDateString()}
         </IndexTable.Cell>
         <IndexTable.Cell>
           <ButtonGroup>
-            {recommendation.type === RecommendationType.PRICING && (
+            {hasPricingIssues && (
               <Button
                 onClick={() => setSelectedPricingRecommendation({ ...recommendation, createdAt, updatedAt })}
               >
                 Update Pricing
               </Button>
             )}
-            {recommendation.type === RecommendationType.DEFINITION && (
-              <>
-                {(recommendation.subType === RecommendationSubType.SHORT_TITLE ||
-                  recommendation.subType === RecommendationSubType.LONG_TITLE) && (
-                  <Button onClick={() => setSelectedTitleRecommendation({ ...recommendation, createdAt, updatedAt })}>
-                    Edit Title
-                  </Button>
-                )}
-                {(recommendation.subType === RecommendationSubType.SHORT_DESCRIPTION ||
-                  recommendation.subType === RecommendationSubType.LONG_DESCRIPTION) && (
-                  <Button onClick={() => setSelectedDescriptionRecommendation({ ...recommendation, createdAt, updatedAt })}>
-                    Edit Description
-                  </Button>
-                )}
-              </>
-            )}
-            {recommendation.type === RecommendationType.STOCK &&
-              recommendation.subType === RecommendationSubType.NO_STOCK && (
+            {hasDefinitionIssues && (
               <Button
-                tone="critical"
-                onClick={() => {
-                  fetcher.submit(
-                    {
-                      action: 'archive_delete',
-                      recommendationId: recommendation.id,
-                    },
-                    { method: 'post' }
-                  );
-                }}
+                onClick={() => setSelectedDefinitionRecommendation({ ...recommendation, createdAt, updatedAt })}
               >
-                {recommendation.targetType === TargetType.PRODUCT ? 'Archive Product' : 'Delete Variant'}
+                {recommendation.subTypes.some(st => ['SHORT_TITLE', 'LONG_TITLE'].includes(st))
+                  ? 'Update Title'
+                  : 'Update Description'
+                }
+              </Button>
+            )}
+            {hasStockIssues && (
+              <Button>
+                Update Stock
               </Button>
             )}
             <Button
@@ -243,14 +220,14 @@ export default function Index() {
               onClick={() => {
                 fetcher.submit(
                   {
-                    action: 'skip',
+                    action: 'archive_delete',
                     recommendationId: recommendation.id,
                   },
                   { method: 'post' }
                 );
               }}
             >
-              Skip
+              {recommendation.targetType === "PRODUCT" ? 'Archive' : 'Delete'}
             </Button>
           </ButtonGroup>
         </IndexTable.Cell>
@@ -278,14 +255,6 @@ export default function Index() {
         loading: fetcher.state === "submitting",
       }}
     >
-      <div style={{ padding: "16px 0" }}>
-        <Button
-          onClick={() => setShowSkipped(!showSkipped)}
-          pressed={showSkipped}
-        >
-          {showSkipped ? "Hide Skipped" : "Show Skipped"}
-        </Button>
-      </div>
       <IndexFilters
         tabs={tabs}
         selected={selectedTab}
@@ -302,25 +271,21 @@ export default function Index() {
         loading={isLoading}
       />
       <UpdateTitleModal
-        recommendation={selectedTitleRecommendation}
+        recommendation={selectedDefinitionRecommendation}
         settings={data.settings}
-        onClose={() => setSelectedTitleRecommendation(null)}
+        onClose={() => setSelectedDefinitionRecommendation(null)}
       />
       <UpdatePricingModal
         recommendation={selectedPricingRecommendation}
         settings={data.settings}
         onClose={() => setSelectedPricingRecommendation(null)}
       />
-      <UpdateDescriptionModal
-        recommendation={selectedDescriptionRecommendation}
-        settings={data.settings}
-        onClose={() => setSelectedDescriptionRecommendation(null)}
-      />
       <IndexTable
         resourceName={resourceName}
         itemCount={totalCount}
         headings={[
           { title: "Title" },
+          { title: "Target" },
           { title: "Issue" },
           { title: "Date Created" },
           { title: "Actions" },
