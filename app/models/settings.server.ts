@@ -3,19 +3,17 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 
 const DEFAULT_SETTINGS = {
-  shortTitleLength: 10,
-  longTitleLength: 100,
-  shortDescriptionLength: 50,
-  longDescriptionLength: 500,
-  minRevenueRate: 0.2,
-  maxRevenueRate: 0.8,
-  lowDiscountRate: 0.1,
-  highDiscountRate: 0.5,
-  understockDays: 3,
-  overstockDays: 30,
-  passiveDays: 90,
-  noStockAction: "HIDE",
-  passiveAction: "ARCHIVE",
+  shortTitleLength: 20,
+  longTitleLength: 70,
+  shortDescriptionLength: 80,
+  longDescriptionLength: 400,
+  minRevenueRate: 0.1,
+  maxRevenueRate: 0.9,
+  lowDiscountRate: 0.05,
+  highDiscountRate: 0.7,
+  understockDays: 7,
+  overstockDays: 60,
+  passiveDays: 180,
 } as const;
 
 export async function getShopSettings(request: Request): Promise<Settings> {
@@ -24,7 +22,6 @@ export async function getShopSettings(request: Request): Promise<Settings> {
     where: { shop: session.shop },
   });
 
-  // Return default settings if none exist
   return settings ?? {
     id: "",
     shop: session.shop,

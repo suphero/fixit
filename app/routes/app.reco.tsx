@@ -6,28 +6,32 @@ import {
   useSetIndexFiltersMode,
   Button,
   ButtonGroup,
+  Badge,
 } from "@shopify/polaris";
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import type { RecommendationType, Recommendation } from "@prisma/client";
+import type { Recommendation } from "@prisma/client";
+import { RecommendationType, RecommendationSubType, TargetType, RecommendationStatus } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import {
-  initializeAllProducts,
-  initializeAllProductVariants,
-  getAllCounts,
-  getRecommendationList,
+  initializeAll,
+  getRecommendationCounts,
+  getRecommendationsByType,
   skipRecommendation,
-} from "../models/reco.server";
+  archiveOrDelete,
+  unskipRecommendation,
+} from "../models/recommendation.server";
+import { TAB_DEFINITIONS, getSubTypeDefinition } from "app/constants/recommendations";
 import { getShopSettings } from "../models/settings.server";
 import { getShopifyAdminUrl } from "../utils/url";
 import { UpdateTitleModal } from "./app.reco.update-title";
-import { UpdatePriceModal } from "./app.reco.update-price";
+import { UpdatePricingModal } from "./app.reco.update-pricing";
+import { UpdateDescriptionModal } from "./app.reco.update-description";
 
-type RecommendationCount = Record<RecommendationType, number>;
 type LoaderData = {
   shop: string;
-  counts: RecommendationCount;
+  counts: Record<RecommendationType, number>;
   settings: {
     shortTitleLength: number;
     longTitleLength: number;
@@ -39,9 +43,13 @@ type LoaderData = {
     highDiscountRate: number;
   };
   activeTab?: {
-    id: string;
+    type: RecommendationType;
     data: Recommendation[];
     count: number;
+    subTypes: {
+      type: RecommendationSubType;
+      label: string;
+    }[];
   }
 };
 
@@ -49,22 +57,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const page = Number(url.searchParams.get("page") ?? "1");
   const size = Number(url.searchParams.get("size") ?? "10");
-  const tabId = url.searchParams.get("tab");
+  const type = url.searchParams.get("type") as RecommendationType;
   const showSkipped = url.searchParams.get("showSkipped") === "true";
 
   const { session } = await authenticate.admin(request);
+  const status = showSkipped ? [RecommendationStatus.PENDING, RecommendationStatus.IGNORED] : RecommendationStatus.PENDING;
   const [typeCounts, settings] = await Promise.all([
-    getAllCounts(request, showSkipped),
+    getRecommendationCounts(request, status),
     getShopSettings(request)
   ]);
 
   let activeTab;
-  if (tabId) {
-    const type = tabId as RecommendationType;
-    if (TAB_DEFINITIONS[type]) {
-      const data = await getRecommendationList(request, type, page, size, showSkipped);
-      activeTab = { id: type, count: typeCounts[type] ?? 0, data };
-    }
+  if (type && TAB_DEFINITIONS[type]) {
+    const data = await getRecommendationsByType(request, type, status, page, size);
+    activeTab = {
+      type,
+      count: typeCounts[type] ?? 0,
+      data,
+      subTypes: TAB_DEFINITIONS[type].subTypes,
+    };
   }
 
   return { shop: session.shop, counts: typeCounts, settings, activeTab };
@@ -72,42 +83,32 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
-  const { admin, session } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const action = formData.get('action');
   const showSkipped = formData.get('showSkipped') === 'true';
+  const status = showSkipped ? [RecommendationStatus.PENDING, RecommendationStatus.IGNORED] : RecommendationStatus.PENDING;
+  const recommendationId = formData.get('recommendationId') as string;
 
-  if (action === 'skip') {
-    const recommendationId = formData.get('recommendationId') as string;
-    await skipRecommendation(request, recommendationId);
-
-    const counts = await getAllCounts(request, showSkipped);
-    return { shop: session.shop, counts };
+  switch (action) {
+    case 'skip':
+      await skipRecommendation(request, recommendationId);
+      break;
+    case 'unskip':
+      await unskipRecommendation(request, recommendationId);
+      break;
+    case 'archive_delete':
+      await archiveOrDelete(request, recommendationId);
+      break;
+    case 'initialize':
+      await initializeAll(request);
+      break;
+    default:
+      throw new Error(`Invalid action: ${action}`);
   }
 
-  await initializeAllProducts(request, admin.graphql);
-  await initializeAllProductVariants(request, admin.graphql);
-
-  const counts = await getAllCounts(request, showSkipped);
+  const counts = await getRecommendationCounts(request, status);
   return { shop: session.shop, counts };
 }
-
-const TAB_DEFINITIONS: Record<RecommendationType, string> = {
-  NO_IMAGE: "No Image",
-  SHORT_TITLE: "Short Title",
-  LONG_TITLE: "Long Title",
-  SHORT_DESCRIPTION: "Short Desc",
-  LONG_DESCRIPTION: "Long Desc",
-  NO_STOCK: "No Stock",
-  NO_COST: "No Cost",
-  SALE_AT_LOSS: "Sale at Loss",
-  CHEAP: "Cheap",
-  EXPENSIVE: "Expensive",
-  LOW_DISCOUNT: "Low Discount",
-  HIGH_DISCOUNT: "High Discount",
-  UNDERSTOCK: "Understock",
-  OVERSTOCK: "Overstock",
-  PASSIVE: "Passive",
-} as const;
 
 const PAGE_SIZE = 10;
 
@@ -118,22 +119,21 @@ export default function Index() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [page, setPage] = useState(1);
   const [selectedTitleRecommendation, setSelectedTitleRecommendation] = useState<Recommendation | null>(null);
-  const [selectedPriceRecommendation, setSelectedPriceRecommendation] = useState<Recommendation | null>(null);
+  const [selectedPricingRecommendation, setSelectedPricingRecommendation] = useState<Recommendation | null>(null);
+  const [selectedDescriptionRecommendation, setSelectedDescriptionRecommendation] = useState<Recommendation | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
 
-  const tabs = Object.entries(TAB_DEFINITIONS)
-    .map(([type, content]) => {
-      const count = (fetcher.data?.counts ?? data.counts)[type as RecommendationType] ?? 0;
-      return {
-        content: count > 0 ? `${content} (${count})` : content,
-        id: type,
-      };
-    })
-    .filter((tab) => (fetcher.data?.counts ?? data.counts)[tab.id as RecommendationType] > 0);
+  const tabs = Object.entries(TAB_DEFINITIONS).map(([type, definition]) => {
+    const count = (fetcher.data?.counts ?? data.counts)[type as RecommendationType] ?? 0;
+    return {
+      content: count > 0 ? `${definition.content} (${count})` : definition.content,
+      id: type,
+    };
+  }).filter(tab => (fetcher.data?.counts ?? data.counts)[tab.id as RecommendationType] > 0);
 
   useEffect(() => {
     if (tabs.length > 0) {
-      fetcher.load(`/app/reco?tab=${tabs[selectedTab].id}&page=${page}&size=${PAGE_SIZE}&showSkipped=${showSkipped}`);
+      fetcher.load(`/app/reco?type=${tabs[selectedTab].id}&page=${page}&size=${PAGE_SIZE}&showSkipped=${showSkipped}`);
     }
   }, [tabs.length, selectedTab, page, showSkipped]);
 
@@ -149,7 +149,7 @@ export default function Index() {
         title="Recommendations"
         primaryAction={{
           content: "Initialize",
-          onAction: () => fetcher.submit(null, { method: "post" }),
+          onAction: () => fetcher.submit({ action: 'initialize' }, { method: "post" }),
           loading: fetcher.state === "submitting",
         }}
       >
@@ -171,6 +171,7 @@ export default function Index() {
   const rowMarkup = recommendations.map((recommendation, index) => {
     const createdAt = new Date(recommendation.createdAt);
     const updatedAt = new Date(recommendation.updatedAt);
+    const subTypeLabel = getSubTypeDefinition(recommendation.subType);
     return (
       <IndexTable.Row
         id={recommendation.id}
@@ -188,69 +189,70 @@ export default function Index() {
           </Button>
         </IndexTable.Cell>
         <IndexTable.Cell>
+          <Badge icon={subTypeLabel.icon} tone={subTypeLabel.tone}>
+            {subTypeLabel.label}
+          </Badge>
+        </IndexTable.Cell>
+        <IndexTable.Cell>
           {createdAt.toLocaleDateString()}
         </IndexTable.Cell>
         <IndexTable.Cell>
-          {recommendation.status === 'IGNORED' ? (
-            <Button
-              onClick={() => {
-                fetcher.submit(
-                  {
-                    action: 'unskip',
-                    recommendationId: recommendation.id,
-                  },
-                  { method: 'post' }
-                );
-              }}
-            >
-              Unskip
-            </Button>
-          ) : (
-            <ButtonGroup>
-              {(recommendation.type === 'SHORT_TITLE' ||
-                recommendation.type === 'LONG_TITLE') && (
-                <Button
-                  onClick={() => {
-                    setSelectedTitleRecommendation({
-                      ...recommendation,
-                      createdAt,
-                      updatedAt,
-                    });
-                  }}
-                >
-                  Edit Title
-                </Button>
-              )}
-              {(recommendation.type === 'CHEAP' ||
-                recommendation.type === 'EXPENSIVE') && (
-                <Button
-                  onClick={() => {
-                    setSelectedPriceRecommendation({
-                      ...recommendation,
-                      createdAt,
-                      updatedAt,
-                    });
-                  }}
-                >
-                  Edit Price
-                </Button>
-              )}
+          <ButtonGroup>
+            {recommendation.type === RecommendationType.PRICING && (
+              <Button
+                onClick={() => setSelectedPricingRecommendation({ ...recommendation, createdAt, updatedAt })}
+              >
+                Update Pricing
+              </Button>
+            )}
+            {recommendation.type === RecommendationType.DEFINITION && (
+              <>
+                {(recommendation.subType === RecommendationSubType.SHORT_TITLE ||
+                  recommendation.subType === RecommendationSubType.LONG_TITLE) && (
+                  <Button onClick={() => setSelectedTitleRecommendation({ ...recommendation, createdAt, updatedAt })}>
+                    Edit Title
+                  </Button>
+                )}
+                {(recommendation.subType === RecommendationSubType.SHORT_DESCRIPTION ||
+                  recommendation.subType === RecommendationSubType.LONG_DESCRIPTION) && (
+                  <Button onClick={() => setSelectedDescriptionRecommendation({ ...recommendation, createdAt, updatedAt })}>
+                    Edit Description
+                  </Button>
+                )}
+              </>
+            )}
+            {recommendation.type === RecommendationType.STOCK &&
+              recommendation.subType === RecommendationSubType.NO_STOCK && (
               <Button
                 tone="critical"
                 onClick={() => {
                   fetcher.submit(
                     {
-                      action: 'skip',
+                      action: 'archive_delete',
                       recommendationId: recommendation.id,
                     },
                     { method: 'post' }
                   );
                 }}
               >
-                Skip
+                {recommendation.targetType === TargetType.PRODUCT ? 'Archive Product' : 'Delete Variant'}
               </Button>
-            </ButtonGroup>
-          )}
+            )}
+            <Button
+              tone="critical"
+              onClick={() => {
+                fetcher.submit(
+                  {
+                    action: 'skip',
+                    recommendationId: recommendation.id,
+                  },
+                  { method: 'post' }
+                );
+              }}
+            >
+              Skip
+            </Button>
+          </ButtonGroup>
         </IndexTable.Cell>
       </IndexTable.Row>
     );
@@ -259,12 +261,12 @@ export default function Index() {
   const handleTabChange = (selectedTabIndex: number) => {
     setSelectedTab(selectedTabIndex);
     setPage(1);
-    fetcher.load(`/app/reco?tab=${tabs[selectedTabIndex].id}&page=1&size=${PAGE_SIZE}`);
+    fetcher.load(`/app/reco?type=${tabs[selectedTabIndex].id}&page=1&size=${PAGE_SIZE}`);
   };
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    fetcher.load(`/app/reco?tab=${tabs[selectedTab].id}&page=${newPage}&size=${PAGE_SIZE}`);
+    fetcher.load(`/app/reco?type=${tabs[selectedTab].id}&page=${newPage}&size=${PAGE_SIZE}`);
   };
 
   return (
@@ -272,7 +274,7 @@ export default function Index() {
       title="Recommendations"
       primaryAction={{
         content: "Initialize",
-        onAction: () => fetcher.submit(null, { method: "post" }),
+        onAction: () => fetcher.submit({ action: 'initialize' }, { method: "post" }),
         loading: fetcher.state === "submitting",
       }}
     >
@@ -304,18 +306,24 @@ export default function Index() {
         settings={data.settings}
         onClose={() => setSelectedTitleRecommendation(null)}
       />
-      <UpdatePriceModal
-        recommendation={selectedPriceRecommendation}
+      <UpdatePricingModal
+        recommendation={selectedPricingRecommendation}
         settings={data.settings}
-        onClose={() => setSelectedPriceRecommendation(null)}
+        onClose={() => setSelectedPricingRecommendation(null)}
+      />
+      <UpdateDescriptionModal
+        recommendation={selectedDescriptionRecommendation}
+        settings={data.settings}
+        onClose={() => setSelectedDescriptionRecommendation(null)}
       />
       <IndexTable
         resourceName={resourceName}
         itemCount={totalCount}
         headings={[
           { title: "Title" },
+          { title: "Issue" },
           { title: "Date Created" },
-          { title: "" },
+          { title: "Actions" },
         ]}
         loading={isLoading}
         selectable={false}

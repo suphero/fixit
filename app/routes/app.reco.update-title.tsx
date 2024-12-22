@@ -3,7 +3,7 @@ import type { Recommendation } from "@prisma/client";
 import { useFetcher } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs } from "@remix-run/node";
-import { updateProductTitle } from "../models/reco.server";
+import { updateTitle } from "../models/recommendation.server";
 
 interface UpdateTitleModalProps {
   recommendation: Recommendation | null;
@@ -19,7 +19,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const recommendationId = formData.get('recommendationId') as string;
   const newTitle = formData.get('newTitle') as string;
 
-  await updateProductTitle(request, recommendationId, newTitle);
+  await updateTitle(request, recommendationId, newTitle);
   return { success: true };
 }
 
