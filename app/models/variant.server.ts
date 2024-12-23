@@ -5,7 +5,8 @@ export async function getDetails(request: Request, variantId: string) {
   const { admin } = await authenticate.admin(request);
 
   const response = await admin.graphql(
-    `query getVariant($id: ID!) {
+    `#graphql
+    query getVariant($id: ID!) {
       productVariant(id: $id) {
         price
         compareAtPrice
@@ -35,34 +36,33 @@ export async function getDetails(request: Request, variantId: string) {
 
 export async function fetch(graphql: AdminGraphqlClient, cursor: string | null) {
   const response = await graphql(
-    `
-      query getProductVariants($cursor: String) {
-        productVariants(first: 50, after: $cursor, query: "status:active") {
-          edges {
-            node {
-              id
-              title
-              price
-              compareAtPrice
-              inventoryItem {
-                unitCost {
-                  amount
-                }
-              }
-              product {
-                id
-                title
-                hasOnlyDefaultVariant
+    `#graphql
+    query getProductVariants($cursor: String) {
+      productVariants(first: 50, after: $cursor, query: "status:active") {
+        edges {
+          node {
+            id
+            title
+            price
+            compareAtPrice
+            inventoryItem {
+              unitCost {
+                amount
               }
             }
-            cursor
+            product {
+              id
+              title
+              hasOnlyDefaultVariant
+            }
           }
-          pageInfo {
-            hasNextPage
-          }
+          cursor
+        }
+        pageInfo {
+          hasNextPage
         }
       }
-    `,
+    }`,
     { variables: { cursor } },
   );
   const { data } = await response.json();
@@ -78,24 +78,23 @@ export function updatePricing(
   compareAtPrice?: string,
 ) {
   return graphql(
-    `
-      mutation ProductVariantsBulkUpdate(
-        $productId: ID!
-        $variants: [ProductVariantsBulkInput!]!
-      ) {
-        productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-          productVariants {
-            id
-            price
-            compareAtPrice
-          }
-          userErrors {
-            field
-            message
-          }
+    `#graphql
+    mutation ProductVariantsBulkUpdate(
+      $productId: ID!
+      $variants: [ProductVariantsBulkInput!]!
+    ) {
+      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+        productVariants {
+          id
+          price
+          compareAtPrice
+        }
+        userErrors {
+          field
+          message
         }
       }
-    `,
+    }`,
     {
       variables: {
         productId,
@@ -116,23 +115,22 @@ export function updatePricing(
 
 export function deleteVariant(graphql: AdminGraphqlClient, productId: string, variantId: string) {
   return graphql(
-    `
-      mutation ProductVariantsDelete($productId: ID!, $variantsIds: [ID!]!) {
-        productVariantsBulkDelete(
-          productId: $productId
-          variantsIds: $variantsIds
-        ) {
-          product {
-            id
-            title
-          }
-          userErrors {
-            field
-            message
-          }
+    `#graphql
+    mutation ProductVariantsDelete($productId: ID!, $variantsIds: [ID!]!) {
+      productVariantsBulkDelete(
+        productId: $productId
+        variantsIds: $variantsIds
+      ) {
+        product {
+          id
+          title
+        }
+        userErrors {
+          field
+          message
         }
       }
-    `,
+    }`,
     {
       variables: {
         productId,
@@ -144,7 +142,8 @@ export function deleteVariant(graphql: AdminGraphqlClient, productId: string, va
 
 export async function isVariantDefault(graphql: AdminGraphqlClient, variantId: string): Promise<boolean> {
   const response = await graphql(
-    `query getProductVariant($id: ID!) {
+    `#graphql
+    query getProductVariant($id: ID!) {
       productVariant(id: $id) {
         product {
           hasOnlyDefaultVariant

@@ -145,9 +145,12 @@ export function UpdatePricingModal({ recommendation, settings, onClose }: Update
       primaryAction={{
         content: 'Update',
         onAction: () => {
+          if (!recommendation) {
+            throw new Error('Recommendation is required');
+          }
           submitFetcher.submit(
             {
-              recommendationId: recommendation?.id ?? '',
+              recommendationId: recommendation.id,
               cost,
               price,
               compareAtPrice,

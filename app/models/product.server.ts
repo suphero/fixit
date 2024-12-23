@@ -6,20 +6,19 @@ export function updateTitle(
   title: string,
 ) {
   return graphql(
-    `
-      mutation ProductUpdate($input: ProductUpdateInput!) {
-        productUpdate(product: $input) {
-          product {
-            id
-            title
-          }
-          userErrors {
-            field
-            message
-          }
+    `#graphql
+    mutation ProductUpdate($input: ProductUpdateInput!) {
+      productUpdate(product: $input) {
+        product {
+          id
+          title
+        }
+        userErrors {
+          field
+          message
         }
       }
-    `,
+    }`,
     {
       variables: {
         input: {
@@ -33,20 +32,19 @@ export function updateTitle(
 
 export function archive(graphql: AdminGraphqlClient, id: string) {
   return graphql(
-    `
-      mutation productUpdate($input: ProductUpdateInput!) {
-        productUpdate(product: $input) {
-          product {
-            id
-            status
-          }
-          userErrors {
-            field
-            message
-          }
+    `#graphql
+    mutation productUpdate($input: ProductUpdateInput!) {
+      productUpdate(product: $input) {
+        product {
+          id
+          status
+        }
+        userErrors {
+          field
+          message
         }
       }
-    `,
+    }`,
     {
       variables: {
         input: {
@@ -64,7 +62,7 @@ export async function updateDescription(
   descriptionHtml: string,
 ) {
   return graphql(
-    `
+    `#graphql
       mutation productUpdate($input: ProductUpdateInput!) {
         productUpdate(product: $input) {
           product {
@@ -94,27 +92,26 @@ export async function fetch(
   cursor: string | null,
 ) {
   const response = await graphql(
-    `
-      query getProducts($cursor: String) {
-        products(first: 50, after: $cursor, query: "status:active") {
-          edges {
-            node {
+    `#graphql
+    query getProducts($cursor: String) {
+      products(first: 50, after: $cursor, query: "status:active") {
+        edges {
+          node {
+            id
+            title
+            description
+            totalInventory
+            featuredMedia {
               id
-              title
-              description
-              totalInventory
-              featuredMedia {
-                id
-              }
             }
-            cursor
           }
-          pageInfo {
-            hasNextPage
-          }
+          cursor
+        }
+        pageInfo {
+          hasNextPage
         }
       }
-    `,
+    }`,
     { variables: { cursor } },
   );
   const { data } = await response.json();

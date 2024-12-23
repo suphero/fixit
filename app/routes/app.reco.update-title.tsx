@@ -39,10 +39,13 @@ export function UpdateTitleModal({ recommendation, settings, onClose }: UpdateTi
   }, [fetcher.state, fetcher.data]);
 
   const handleUpdateTitle = () => {
+    if (!recommendation) {
+      throw new Error('Recommendation is required');
+    }
     setUpdateError('');
     fetcher.submit(
       {
-        recommendationId: recommendation?.id ?? '',
+        recommendationId: recommendation.id,
         newTitle,
       },
       {

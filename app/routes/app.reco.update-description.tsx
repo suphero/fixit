@@ -50,10 +50,13 @@ export function UpdateDescriptionModal({ recommendation, settings, onClose }: Up
       primaryAction={{
         content: 'Update',
         onAction: () => {
+          if (!recommendation) {
+            throw new Error('Recommendation is required');
+          }
           setUpdateError('');
           fetcher.submit(
             {
-              recommendationId: recommendation?.id ?? '',
+              recommendationId: recommendation.id,
               newDescription,
             },
             { method: 'post' }
