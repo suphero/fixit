@@ -61,10 +61,12 @@ enum RecommendationType {
 
 enum RecommendationSubType {
   // Pricing related
+  FREE
   CHEAP
   EXPENSIVE
   NO_COST
   SALE_AT_LOSS
+  NO_DISCOUNT
   LOW_DISCOUNT
   HIGH_DISCOUNT
 

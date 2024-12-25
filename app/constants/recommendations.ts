@@ -60,6 +60,12 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
         icon: AlertTriangleIcon,
       },
       {
+        type: "NO_DISCOUNT",
+        label: "No Discount",
+        tone: "info",
+        icon: CartDiscountIcon,
+      },
+      {
         type: "LOW_DISCOUNT",
         label: "Low Discount",
         tone: "attention",
@@ -70,6 +76,12 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
         label: "High Discount",
         tone: "success-strong",
         icon: DiscountFilledIcon,
+      },
+      {
+        type: "FREE",
+        label: "Free",
+        tone: "success",
+        icon: GiftCardIcon,
       },
     ],
   },

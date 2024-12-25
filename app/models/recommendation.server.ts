@@ -42,6 +42,12 @@ const getPricingCriteria = (settings: Settings) => ({
   NO_COST: {
     filter: (node: ProductVariantNode) => node.inventoryItem?.unitCost === null,
   },
+  FREE: {
+    filter: (node: ProductVariantNode) => {
+      const price = Number(node.price ?? 0);
+      return price === 0;
+    },
+  },
   SALE_AT_LOSS: {
     filter: (node: ProductVariantNode) => {
       const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
@@ -65,6 +71,14 @@ const getPricingCriteria = (settings: Settings) => ({
       if (cost === 0 || price === 0) return false;
       return price > cost * (1 + settings.maxRevenueRate);
     },
+  },
+  NO_DISCOUNT: {
+    filter: (node: ProductVariantNode) => {
+      const price = Number(node.price ?? 0);
+      const compareAtPrice = Number(node.compareAtPrice ?? 0);
+      if (!compareAtPrice) return false;
+      return compareAtPrice <= price;
+    }
   },
   LOW_DISCOUNT: {
     filter: (node: ProductVariantNode) => {
