@@ -128,12 +128,12 @@ function findRecommendation(shop: string, id: string) {
 }
 
 async function updateRecommendationStatus(
-  recommendationId: string,
+  id: string,
   status: RecommendationStatus,
   updates: Partial<Recommendation> = {},
 ) {
   return db.recommendation.update({
-    where: { id: recommendationId },
+    where: { id },
     data: {
       status,
       ...updates,
@@ -166,7 +166,6 @@ async function getProductRecommendations(
           productId: node.id,
           variantId: null,
           targetTitle: node.title,
-          targetDescriptionHtml: node.descriptionHtml,
           targetUrl: getProductUrlFromGid(node.id),
           type: RecommendationType.DEFINITION,
           subTypes: definitionIssues,
@@ -186,7 +185,6 @@ async function getProductRecommendations(
           productId: node.id,
           variantId: null,
           targetTitle: node.title,
-          targetDescriptionHtml: node.descriptionHtml,
           targetUrl: getProductUrlFromGid(node.id),
           type: RecommendationType.STOCK,
           subTypes: stockIssues,
@@ -232,7 +230,6 @@ async function getProductVariantRecommendations(
           targetTitle: isVariantDefault
             ? node.product.title
             : `${node.product.title} - ${node.title}`,
-          targetDescriptionHtml: node.product.descriptionHtml,
           targetUrl: getProductVariantUrlFromGid(
             node.product.id,
             node.id,
@@ -359,12 +356,12 @@ interface TextUpdate {
 
 export async function updateText(
   request: Request,
-  recommendationId: string,
+  id: string,
   { title, descriptionHtml }: TextUpdate,
 ) {
   const { admin, session } = await authenticate.admin(request);
   const settings = await getShopSettings(request);
-  const recommendation = await findRecommendation(session.shop, recommendationId);
+  const recommendation = await findRecommendation(session.shop, id);
   if (!recommendation) throw new Error("Recommendation not found");
   if (!recommendation.productId) throw new Error("Product not found");
 
@@ -396,17 +393,15 @@ export async function updateText(
   );
 
   if (remainingSubTypes.length === 0) {
-    return updateRecommendationStatus(recommendationId, "RESOLVED", {
+    return updateRecommendationStatus(id, "RESOLVED", {
       targetTitle: title,
-      targetDescriptionHtml: descriptionHtml,
     });
   } else {
     return db.recommendation.update({
-      where: { id: recommendationId },
+      where: { id },
       data: {
         subTypes: remainingSubTypes,
         targetTitle: title,
-        targetDescriptionHtml: descriptionHtml,
       },
     });
   }
@@ -414,11 +409,11 @@ export async function updateText(
 
 export async function updateMedia(
   request: Request,
-  recommendationId: string,
+  id: string,
   image: File,
 ) {
   const { admin, session } = await authenticate.admin(request);
-  const recommendation = await findRecommendation(session.shop, recommendationId);
+  const recommendation = await findRecommendation(session.shop, id);
   if (!recommendation) throw new Error("Recommendation not found");
   if (!recommendation.productId) throw new Error("Product not found");
 
@@ -431,10 +426,10 @@ export async function updateMedia(
   );
 
   if (remainingSubTypes.length === 0) {
-    return updateRecommendationStatus(recommendationId, "RESOLVED");
+    return updateRecommendationStatus(id, "RESOLVED");
   } else {
     return db.recommendation.update({
-      where: { id: recommendationId },
+      where: { id },
       data: {
         subTypes: remainingSubTypes,
       },

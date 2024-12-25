@@ -1,7 +1,7 @@
 import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 import { authenticate } from "../shopify.server";
 
-export async function getDetails(request: Request, variantId: string) {
+export async function getDetails(request: Request, id: string) {
   const { admin } = await authenticate.admin(request);
 
   const response = await admin.graphql(
@@ -18,7 +18,7 @@ export async function getDetails(request: Request, variantId: string) {
       }
     }`,
     {
-      variables: { id: variantId },
+      variables: { id },
     },
   );
 

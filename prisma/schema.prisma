@@ -33,7 +33,6 @@ model Recommendation {
   productId           String?
   variantId           String?
   targetTitle         String
-  targetDescriptionHtml   String?
   targetUrl           String
   type                RecommendationType
   subTypes            RecommendationSubType[]

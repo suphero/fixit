@@ -1,4 +1,4 @@
-import { Modal, TextField, Text, BlockStack } from "@shopify/polaris";
+import { Modal, TextField, BlockStack } from "@shopify/polaris";
 import type { Recommendation } from "@prisma/client";
 import { useFetcher } from "@remix-run/react";
 import { useState, useEffect } from "react";
@@ -202,17 +202,12 @@ export function UpdatePricingModal({ recommendation, settings, onClose }: Update
             value={compareAtPrice}
             onChange={setCompareAtPrice}
             autoComplete="off"
-            helpText="Optional. Used for showing discounts."
+            helpText={!error.hasError && compareAtPriceValue && `Discount: ${(((compareAtPriceValue - priceValue) / compareAtPriceValue) * 100).toFixed(1)}%`}
             error={error.compareAtPriceError}
             min={0}
             disabled={isLoading}
             loading={isLoading}
           />
-          {!error.hasError && compareAtPriceValue && !isLoading && (
-            <Text as="p">
-              Discount: {(((compareAtPriceValue - priceValue) / compareAtPriceValue) * 100).toFixed(1)}%
-            </Text>
-          )}
         </BlockStack>
       </Modal.Section>
     </Modal>

@@ -1,4 +1,31 @@
 import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
+import { authenticate } from "../shopify.server";
+
+export async function getDetails(request: Request, id: string) {
+  const { admin } = await authenticate.admin(request);
+
+  const response = await admin.graphql(
+    `#graphql
+    query getProduct($id: ID!) {
+      product(id: $id) {
+        title
+        descriptionHtml
+      }
+    }`,
+    {
+      variables: { id },
+    },
+  );
+
+  const { data } = await response.json();
+  const title = data.product.title;
+  const descriptionHtml = data.product.descriptionHtml;
+
+  return {
+    title,
+    descriptionHtml,
+  };
+}
 
 export async function updateProduct(
   graphql: AdminGraphqlClient,
