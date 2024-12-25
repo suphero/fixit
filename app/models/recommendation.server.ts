@@ -4,6 +4,7 @@ import {
   TargetType,
 } from "@prisma/client";
 import type { Recommendation, RecommendationSubType, Settings, Prisma } from "@prisma/client";
+import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 import { authenticate } from "../shopify.server";
 import { getShopSettings } from "./settings.server";
 import {
@@ -13,7 +14,6 @@ import {
 import db from "../db.server";
 import * as product from "./product.server";
 import * as variant from "./variant.server";
-import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 
 type ProductVariantNode = {
   id: string;
@@ -151,7 +151,7 @@ async function getProductRecommendations(
   let cursor = null;
 
   while (hasNextPage) {
-    const { edges, pageInfo } = await product.fetch(graphql, cursor);
+    const { edges, pageInfo } = await product.fetchProduct(graphql, cursor);
 
     for (const { node } of edges) {
       // Check definition issues
@@ -166,6 +166,7 @@ async function getProductRecommendations(
           productId: node.id,
           variantId: null,
           targetTitle: node.title,
+          targetDescriptionHtml: node.descriptionHtml,
           targetUrl: getProductUrlFromGid(node.id),
           type: RecommendationType.DEFINITION,
           subTypes: definitionIssues,
@@ -185,6 +186,7 @@ async function getProductRecommendations(
           productId: node.id,
           variantId: null,
           targetTitle: node.title,
+          targetDescriptionHtml: node.descriptionHtml,
           targetUrl: getProductUrlFromGid(node.id),
           type: RecommendationType.STOCK,
           subTypes: stockIssues,
@@ -230,6 +232,7 @@ async function getProductVariantRecommendations(
           targetTitle: isVariantDefault
             ? node.product.title
             : `${node.product.title} - ${node.title}`,
+          targetDescriptionHtml: node.product.descriptionHtml,
           targetUrl: getProductVariantUrlFromGid(
             node.product.id,
             node.id,
@@ -313,114 +316,6 @@ export async function initializeAll(request: Request) {
   }
 }
 
-export async function updateTitle(
-  request: Request,
-  recommendationId: string,
-  newTitle: string,
-) {
-  const { admin, session } = await authenticate.admin(request);
-  const settings = await getShopSettings(request);
-
-  const recommendation = await findRecommendation(session.shop, recommendationId);
-  if (!recommendation) throw new Error("Recommendation not found");
-  if (!recommendation.productId) {
-    throw new Error("Product not found");
-  }
-
-  if (newTitle.length < settings.shortTitleLength) {
-    throw new Error(
-      `Title must be at least ${settings.shortTitleLength} characters`,
-    );
-  }
-  if (newTitle.length > settings.longTitleLength) {
-    throw new Error(
-      `Title must not exceed ${settings.longTitleLength} characters`,
-    );
-  }
-
-  await product.updateTitle(admin.graphql, recommendation.productId, newTitle);
-
-  return updateRecommendationStatus(recommendationId, "RESOLVED", {
-    targetTitle: newTitle,
-  });
-}
-
-export async function archiveOrDelete(
-  request: Request,
-  recommendationId: string,
-) {
-  const { admin, session } = await authenticate.admin(request);
-
-  const recommendation = await findRecommendation(
-    session.shop,
-    recommendationId,
-  );
-  if (!recommendation) throw new Error("Recommendation not found");
-  if (!recommendation.productId) {
-    throw new Error("Product not found");
-  }
-
-  if (recommendation.targetType === TargetType.PRODUCT) {
-    await product.archive(admin.graphql, recommendation.productId);
-  } else if (recommendation.targetType === TargetType.PRODUCT_VARIANT) {
-    if (!recommendation.variantId) {
-      throw new Error("Variant not found");
-    }
-    const isDefault = await variant.isVariantDefault(
-      admin.graphql,
-      recommendation.variantId,
-    );
-    if (isDefault) {
-      await product.archive(admin.graphql, recommendation.productId);
-    } else {
-      await variant.deleteVariant(
-        admin.graphql,
-        recommendation.productId,
-        recommendation.variantId,
-      );
-    }
-  } else {
-    throw new Error("Invalid recommendation type");
-  }
-
-  return updateRecommendationStatus(recommendationId, "RESOLVED");
-}
-
-export async function updateDescription(
-  request: Request,
-  recommendationId: string,
-  newDescription: string,
-) {
-  const { admin, session } = await authenticate.admin(request);
-  const settings = await getShopSettings(request);
-
-  const recommendation = await findRecommendation(
-    session.shop,
-    recommendationId,
-  );
-  if (!recommendation) throw new Error("Recommendation not found");
-
-  if (!recommendation.productId) {
-    throw new Error("Product not found");
-  }
-
-  // Validate description length
-  if (newDescription.length < settings.shortDescriptionLength) {
-    throw new Error(
-      `Description must be at least ${settings.shortDescriptionLength} characters`,
-    );
-  }
-  if (newDescription.length > settings.longDescriptionLength) {
-    throw new Error(
-      `Description must not exceed ${settings.longDescriptionLength} characters`,
-    );
-  }
-
-  await product.updateDescription(admin.graphql, recommendation.productId, newDescription);
-
-  return updateRecommendationStatus(recommendationId, "RESOLVED");
-}
-
 interface PricingUpdate {
   cost?: string;
   price?: string;
@@ -455,4 +350,94 @@ export async function updatePricing(
   );
 
   return updateRecommendationStatus(recommendationId, "RESOLVED");
+}
+
+interface TextUpdate {
+  title: string;
+  descriptionHtml: string;
+}
+
+export async function updateText(
+  request: Request,
+  recommendationId: string,
+  { title, descriptionHtml }: TextUpdate,
+) {
+  const { admin, session } = await authenticate.admin(request);
+  const settings = await getShopSettings(request);
+  const recommendation = await findRecommendation(session.shop, recommendationId);
+  if (!recommendation) throw new Error("Recommendation not found");
+  if (!recommendation.productId) throw new Error("Product not found");
+
+  // Validate title
+  if (title.length < settings.shortTitleLength) {
+    throw new Error(`Title must be at least ${settings.shortTitleLength} characters`);
+  }
+  if (title.length > settings.longTitleLength) {
+    throw new Error(`Title must not exceed ${settings.longTitleLength} characters`);
+  }
+
+  // Validate description
+  if (descriptionHtml.length < settings.shortDescriptionLength) {
+    throw new Error(`Description must be at least ${settings.shortDescriptionLength} characters`);
+  }
+  if (descriptionHtml.length > settings.longDescriptionLength) {
+    throw new Error(`Description must not exceed ${settings.longDescriptionLength} characters`);
+  }
+
+  // Update product content
+  await product.updateProduct(admin.graphql, recommendation.productId, {
+    title,
+    descriptionHtml,
+  });
+
+  // Update recommendation status only for resolved text issues
+  const remainingSubTypes = recommendation.subTypes.filter(subType =>
+    !['SHORT_TITLE', 'LONG_TITLE', 'SHORT_DESCRIPTION', 'LONG_DESCRIPTION'].includes(subType)
+  );
+
+  if (remainingSubTypes.length === 0) {
+    return updateRecommendationStatus(recommendationId, "RESOLVED", {
+      targetTitle: title,
+      targetDescriptionHtml: descriptionHtml,
+    });
+  } else {
+    return db.recommendation.update({
+      where: { id: recommendationId },
+      data: {
+        subTypes: remainingSubTypes,
+        targetTitle: title,
+        targetDescriptionHtml: descriptionHtml,
+      },
+    });
+  }
+}
+
+export async function updateMedia(
+  request: Request,
+  recommendationId: string,
+  image: File,
+) {
+  const { admin, session } = await authenticate.admin(request);
+  const recommendation = await findRecommendation(session.shop, recommendationId);
+  if (!recommendation) throw new Error("Recommendation not found");
+  if (!recommendation.productId) throw new Error("Product not found");
+
+  // Upload and attach the image
+  await product.updateImage(admin.graphql, recommendation.productId, image);
+
+  // Update recommendation status only for resolved media issues
+  const remainingSubTypes = recommendation.subTypes.filter(subType =>
+    subType !== 'NO_IMAGE'
+  );
+
+  if (remainingSubTypes.length === 0) {
+    return updateRecommendationStatus(recommendationId, "RESOLVED");
+  } else {
+    return db.recommendation.update({
+      where: { id: recommendationId },
+      data: {
+        subTypes: remainingSubTypes,
+      },
+    });
+  }
 }

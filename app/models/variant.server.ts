@@ -113,33 +113,6 @@ export function updatePricing(
   );
 }
 
-export function deleteVariant(graphql: AdminGraphqlClient, productId: string, variantId: string) {
-  return graphql(
-    `#graphql
-    mutation ProductVariantsDelete($productId: ID!, $variantsIds: [ID!]!) {
-      productVariantsBulkDelete(
-        productId: $productId
-        variantsIds: $variantsIds
-      ) {
-        product {
-          id
-          title
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }`,
-    {
-      variables: {
-        productId,
-        variantsIds: [variantId],
-      },
-    },
-  );
-}
-
 export async function isVariantDefault(graphql: AdminGraphqlClient, variantId: string): Promise<boolean> {
   const response = await graphql(
     `#graphql

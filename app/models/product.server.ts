@@ -1,9 +1,12 @@
 import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 
-export function updateTitle(
+export async function updateProduct(
   graphql: AdminGraphqlClient,
   id: string,
-  title: string,
+  input: {
+    title?: string;
+    descriptionHtml?: string;
+  }
 ) {
   return graphql(
     `#graphql
@@ -12,6 +15,7 @@ export function updateTitle(
         product {
           id
           title
+          descriptionHtml
         }
         userErrors {
           field
@@ -23,71 +27,14 @@ export function updateTitle(
       variables: {
         input: {
           id,
-          title,
+          ...input,
         },
       },
     },
   );
 }
 
-export function archive(graphql: AdminGraphqlClient, id: string) {
-  return graphql(
-    `#graphql
-    mutation productUpdate($input: ProductUpdateInput!) {
-      productUpdate(product: $input) {
-        product {
-          id
-          status
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }`,
-    {
-      variables: {
-        input: {
-          id,
-          status: "ARCHIVED",
-        },
-      },
-    },
-  );
-}
-
-export async function updateDescription(
-  graphql: AdminGraphqlClient,
-  id: string,
-  descriptionHtml: string,
-) {
-  return graphql(
-    `#graphql
-      mutation productUpdate($input: ProductUpdateInput!) {
-        productUpdate(product: $input) {
-          product {
-            id
-            descriptionHtml
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `,
-    {
-      variables: {
-        input: {
-          id,
-          descriptionHtml,
-        },
-      },
-    },
-  );
-}
-
-export async function fetch(
+export async function fetchProduct(
   graphql: AdminGraphqlClient,
   cursor: string | null,
 ) {
@@ -116,4 +63,78 @@ export async function fetch(
   );
   const { data } = await response.json();
   return data.products;
+}
+
+export async function updateImage(
+  graphql: AdminGraphqlClient,
+  id: string,
+  image: File
+): Promise<void> {
+  // First, get a staged upload URL
+  const stagedUploadResponse = await graphql(
+    `#graphql
+    mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
+      stagedUploadsCreate(input: $input) {
+        stagedTargets {
+          url
+          resourceUrl
+          parameters {
+            name
+            value
+          }
+        }
+      }
+    }`,
+    {
+      variables: {
+        input: [{
+          filename: image.name,
+          mimeType: image.type,
+          resource: "PRODUCT_IMAGE"
+        }]
+      }
+    }
+  );
+
+  const { data } = await stagedUploadResponse.json();
+  const [{ url, parameters }] = data.stagedUploadsCreate.stagedTargets;
+
+  // Create form data for upload
+  const formData = new FormData();
+  parameters.forEach(({ name, value }: { name: string; value: string }) => {
+    formData.append(name, value);
+  });
+  formData.append('file', image);
+
+  // Upload the file
+  await fetch(url, {
+    method: 'POST',
+    body: formData,
+  });
+
+  // Attach the image to the product
+  await graphql(
+    `#graphql
+    mutation productUpdate($input: ProductUpdateInput!) {
+      productUpdate(product: $input) {
+        product {
+          id
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }`,
+    {
+      variables: {
+        input: {
+          id,
+          images: [{
+            src: parameters.find((p: any) => p.name === 'key')?.value
+          }]
+        }
+      }
+    }
+  );
 }

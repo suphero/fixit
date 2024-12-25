@@ -2,19 +2,28 @@ import type { RecommendationType, RecommendationSubType } from "@prisma/client";
 import type { FunctionComponent, SVGProps } from "react";
 import type { Tone } from "@shopify/polaris/build/ts/src/components/Badge";
 import {
-  DiscountIcon,
+  AlertTriangleIcon,
+  CartDiscountIcon,
   CashDollarIcon,
-  GiftCardIcon,
-  UnknownDeviceIcon,
-  DiscountFilledIcon,
   DisabledIcon,
+  DiscountFilledIcon,
+  DiscountIcon,
+  GiftCardIcon,
+  ImageAltIcon,
+  InventoryFilledIcon,
+  InventoryIcon,
+  PauseCircleIcon,
+  TextBlockIcon,
+  TextIcon,
+  TextInRowsIcon,
+  TextTitleIcon,
 } from "@shopify/polaris-icons";
 
 interface SubTypeDefinition {
   type: RecommendationSubType;
   label: string;
   tone: Tone;
-  icon?: FunctionComponent<SVGProps<SVGSVGElement>>;
+  icon: FunctionComponent<SVGProps<SVGSVGElement>>;
 }
 
 interface TabDefinition {
@@ -42,19 +51,19 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
         type: "NO_COST",
         label: "No Cost",
         tone: "info",
-        icon: UnknownDeviceIcon,
+        icon: GiftCardIcon,
       },
       {
         type: "SALE_AT_LOSS",
         label: "Sale at Loss",
         tone: "critical",
-        icon: GiftCardIcon,
+        icon: AlertTriangleIcon,
       },
       {
         type: "LOW_DISCOUNT",
         label: "Low Discount",
         tone: "attention",
-        icon: DiscountIcon,
+        icon: CartDiscountIcon,
       },
       {
         type: "HIGH_DISCOUNT",
@@ -71,27 +80,31 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
         type: "SHORT_TITLE",
         label: "Short Title",
         tone: "info",
+        icon: TextIcon,
       },
       {
         type: "LONG_TITLE",
         label: "Long Title",
         tone: "info-strong",
+        icon: TextTitleIcon,
       },
       {
         type: "SHORT_DESCRIPTION",
-        label: "Short Description",
+        label: "Short Desc.",
         tone: "info",
+        icon: TextBlockIcon,
       },
       {
         type: "LONG_DESCRIPTION",
-        label: "Long Description",
+        label: "Long Desc.",
         tone: "info-strong",
+        icon: TextInRowsIcon,
       },
       {
         type: "NO_IMAGE",
         label: "No Image",
         tone: "critical",
-        icon: UnknownDeviceIcon,
+        icon: ImageAltIcon,
       },
     ],
   },
@@ -102,11 +115,13 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
         type: "UNDERSTOCK",
         label: "Low Stock",
         tone: "warning",
+        icon: InventoryIcon,
       },
       {
         type: "OVERSTOCK",
         label: "High Stock",
         tone: "attention",
+        icon: InventoryFilledIcon,
       },
       {
         type: "NO_STOCK",
@@ -118,6 +133,7 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
         type: "PASSIVE",
         label: "Inactive Product",
         tone: "read-only",
+        icon: PauseCircleIcon,
       },
     ],
   },
