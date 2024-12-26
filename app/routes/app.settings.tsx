@@ -58,6 +58,12 @@ export default function Settings() {
 
   const formatPercent = (value: number) => `${(value * 100).toFixed(0)}%`;
 
+  const calculatePrice = (basePrice: number, rate: number, isDiscount = false) => {
+    return isDiscount
+      ? basePrice * (1 - rate / 100)  // For discounts: reduce by rate%
+      : basePrice * (1 + rate / 100); // For revenue: increase by rate%
+  };
+
   return (
     <Page
       title="Settings"
@@ -90,20 +96,20 @@ export default function Settings() {
                       label="Minimum Revenue Rate"
                       type="number"
                       suffix="%"
-                      value={String(formValues.minRevenueRate * 100)}
-                      onChange={(value) => handleChange(String(Number(value) / 100), "minRevenueRate")}
+                      value={String(formValues.minRevenueRate)}
+                      onChange={(value) => handleChange(value, "minRevenueRate")}
                       autoComplete="off"
-                      helpText={`Example: Cost $100 + ${formatPercent(formValues.minRevenueRate)} = Min Price $${(100 * (1 + Number(formValues.minRevenueRate))).toFixed(2)}`}
+                      helpText={`Example: Cost $100 + ${formatPercent(Number(formValues.minRevenueRate))} = Min Price $${calculatePrice(100, formValues.minRevenueRate).toFixed(2)}`}
                       min={0}
                     />
                     <TextField
                       label="Maximum Revenue Rate"
                       type="number"
                       suffix="%"
-                      value={String(formValues.maxRevenueRate * 100)}
-                      onChange={(value) => handleChange(String(Number(value) / 100), "maxRevenueRate")}
+                      value={String(formValues.maxRevenueRate)}
+                      onChange={(value) => handleChange(value, "maxRevenueRate")}
                       autoComplete="off"
-                      helpText={`Example: Cost $100 + ${formatPercent(formValues.maxRevenueRate)} = Max Price $${(100 * (1 + Number(formValues.maxRevenueRate))).toFixed(2)}`}
+                      helpText={`Example: Cost $100 + ${formatPercent(Number(formValues.maxRevenueRate))} = Max Price $${calculatePrice(100, formValues.maxRevenueRate).toFixed(2)}`}
                       min={0}
                     />
                   </InlineGrid>
@@ -123,20 +129,20 @@ export default function Settings() {
                       label="Low Discount Rate"
                       type="number"
                       suffix="%"
-                      value={String(formValues.lowDiscountRate * 100)}
-                      onChange={(value) => handleChange(String(Number(value) / 100), "lowDiscountRate")}
+                      value={String(formValues.lowDiscountRate)}
+                      onChange={(value) => handleChange(value, "lowDiscountRate")}
                       autoComplete="off"
-                      helpText={`Example: Compare $100 - ${formatPercent(formValues.lowDiscountRate)} = Price $${(100 * (1 - Number(formValues.lowDiscountRate))).toFixed(2)}`}
+                      helpText={`Example: Compare $100 - ${formatPercent(Number(formValues.lowDiscountRate))} = Price $${calculatePrice(100, formValues.lowDiscountRate, true).toFixed(2)}`}
                       min={0}
                     />
                     <TextField
                       label="High Discount Rate"
                       type="number"
                       suffix="%"
-                      value={String(formValues.highDiscountRate * 100)}
-                      onChange={(value) => handleChange(String(Number(value) / 100), "highDiscountRate")}
+                      value={String(formValues.highDiscountRate)}
+                      onChange={(value) => handleChange(value, "highDiscountRate")}
                       autoComplete="off"
-                      helpText={`Example: Compare $100 - ${formatPercent(formValues.highDiscountRate)} = Price $${(100 * (1 - Number(formValues.highDiscountRate))).toFixed(2)}`}
+                      helpText={`Example: Compare $100 - ${formatPercent(Number(formValues.highDiscountRate))} = Price $${calculatePrice(100, formValues.highDiscountRate, true).toFixed(2)}`}
                       min={0}
                     />
                   </InlineGrid>
