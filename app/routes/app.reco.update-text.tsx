@@ -30,7 +30,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const title = formData.get('title') as string;
   const description = formData.get('description') as string;
 
-  await updateText(request, recommendationId, {
+  await updateText(request, {
+    id: recommendationId,
     title,
     descriptionHtml: description,
   });

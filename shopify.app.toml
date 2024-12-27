@@ -1,14 +1,14 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "d713d4c7b0fc50d65d4a1554ba059827"
-application_url = "https://required-inclusive-yeah-nearest.trycloudflare.com"
+application_url = "https://anything-validity-legendary-executives.trycloudflare.com"
 embedded = true
 name = "[DEV] Smart Forecast"
 handle = "dev-p-smart-forecast"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_products, write_products, read_orders, read_customers, read_inventory, read_reports"
+scopes = "read_products, write_products, read_orders, read_inventory"
 
 [webhooks]
 api_version = "2022-07"
@@ -19,9 +19,9 @@ api_version = "2022-07"
 
 [auth]
 redirect_urls = [
-  "https://required-inclusive-yeah-nearest.trycloudflare.com/auth/callback",
-  "https://required-inclusive-yeah-nearest.trycloudflare.com/auth/shopify/callback",
-  "https://required-inclusive-yeah-nearest.trycloudflare.com/api/auth/callback"
+  "https://anything-validity-legendary-executives.trycloudflare.com/auth/callback",
+  "https://anything-validity-legendary-executives.trycloudflare.com/auth/shopify/callback",
+  "https://anything-validity-legendary-executives.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
