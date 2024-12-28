@@ -37,102 +37,143 @@ type ProductNode = {
   featuredMedia: { id: string } | null;
 };
 
-const getPricingCriteria = (settings: Settings) => ({
-  NO_COST: {
-    filter: (node: ProductVariantNode) => node.inventoryItem?.unitCost === null,
-  },
-  FREE: {
-    filter: (node: ProductVariantNode) => {
-      const price = Number(node.price ?? 0);
-      return price === 0;
+function getPricingCriteria(
+  settings: Settings,
+  recommendationSubTypes?: RecommendationSubType[],
+) {
+  let criterias = Object.entries({
+    NO_COST: {
+      filter: (node: ProductVariantNode) =>
+        node.inventoryItem?.unitCost === null,
     },
-  },
-  SALE_AT_LOSS: {
-    filter: (node: ProductVariantNode) => {
-      const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
-      const price = Number(node.price ?? 0);
-      if (cost === 0 || price === 0) return false;
-      return price < cost;
+    FREE: {
+      filter: (node: ProductVariantNode) => {
+        const price = Number(node.price ?? 0);
+        return price === 0;
+      },
     },
-  },
-  CHEAP: {
-    filter: (node: ProductVariantNode) => {
-      const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
-      const price = Number(node.price ?? 0);
-      if (cost === 0 || price === 0) return false;
-      return price >= cost && price < cost * (1 + settings.minRevenueRate);
+    SALE_AT_LOSS: {
+      filter: (node: ProductVariantNode) => {
+        const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
+        const price = Number(node.price ?? 0);
+        if (cost === 0 || price === 0) return false;
+        return price < cost;
+      },
     },
-  },
-  EXPENSIVE: {
-    filter: (node: ProductVariantNode) => {
-      const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
-      const price = Number(node.price ?? 0);
-      if (cost === 0 || price === 0) return false;
-      return price > cost * (1 + settings.maxRevenueRate);
+    CHEAP: {
+      filter: (node: ProductVariantNode) => {
+        const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
+        const price = Number(node.price ?? 0);
+        if (cost === 0 || price === 0) return false;
+        return price >= cost && price < cost * (1 + settings.minRevenueRate);
+      },
     },
-  },
-  NO_DISCOUNT: {
-    filter: (node: ProductVariantNode) => {
-      const price = Number(node.price ?? 0);
-      const compareAtPrice = Number(node.compareAtPrice ?? 0);
-      if (!compareAtPrice) return false;
-      return compareAtPrice <= price;
-    }
-  },
-  LOW_DISCOUNT: {
-    filter: (node: ProductVariantNode) => {
-      const price = Number(node.price ?? 0);
-      const compareAtPrice = Number(node.compareAtPrice ?? 0);
-      if (!compareAtPrice) return false;
+    EXPENSIVE: {
+      filter: (node: ProductVariantNode) => {
+        const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
+        const price = Number(node.price ?? 0);
+        if (cost === 0 || price === 0) return false;
+        return price > cost * (1 + settings.maxRevenueRate);
+      },
+    },
+    NO_DISCOUNT: {
+      filter: (node: ProductVariantNode) => {
+        const price = Number(node.price ?? 0);
+        const compareAtPrice = Number(node.compareAtPrice ?? 0);
+        if (!compareAtPrice) return false;
+        return compareAtPrice <= price;
+      },
+    },
+    LOW_DISCOUNT: {
+      filter: (node: ProductVariantNode) => {
+        const price = Number(node.price ?? 0);
+        const compareAtPrice = Number(node.compareAtPrice ?? 0);
+        if (!compareAtPrice) return false;
 
-      const discountPercentage =
-        ((compareAtPrice - price) / compareAtPrice) * 100;
-      return (
-        discountPercentage > 0 &&
-        discountPercentage < settings.lowDiscountRate * 100
-      );
+        const discountPercentage =
+          ((compareAtPrice - price) / compareAtPrice) * 100;
+        return (
+          discountPercentage > 0 &&
+          discountPercentage < settings.lowDiscountRate * 100
+        );
+      },
     },
-  },
-  HIGH_DISCOUNT: {
-    filter: (node: ProductVariantNode) => {
-      const price = Number(node.price ?? 0);
-      const compareAtPrice = Number(node.compareAtPrice ?? 0);
-      if (!compareAtPrice) return false;
+    HIGH_DISCOUNT: {
+      filter: (node: ProductVariantNode) => {
+        const price = Number(node.price ?? 0);
+        const compareAtPrice = Number(node.compareAtPrice ?? 0);
+        if (!compareAtPrice) return false;
 
-      const discountPercentage =
-        ((compareAtPrice - price) / compareAtPrice) * 100;
-      return discountPercentage > settings.highDiscountRate * 100;
+        const discountPercentage =
+          ((compareAtPrice - price) / compareAtPrice) * 100;
+        return discountPercentage > settings.highDiscountRate * 100;
+      },
     },
-  },
-});
+  });
 
-const getDefinitionCriteria = (settings: Settings) => ({
-  NO_IMAGE: {
-    filter: (node: ProductNode) => node.featuredMedia === null,
-  },
-  SHORT_TITLE: {
-    filter: (node: ProductNode) =>
-      node.title.length < settings.shortTitleLength,
-  },
-  LONG_TITLE: {
-    filter: (node: ProductNode) => node.title.length > settings.longTitleLength,
-  },
-  SHORT_DESCRIPTION: {
-    filter: (node: ProductNode) =>
-      node.description.length < settings.shortDescriptionLength,
-  },
-  LONG_DESCRIPTION: {
-    filter: (node: ProductNode) =>
-      node.description.length > settings.longDescriptionLength,
+  if (recommendationSubTypes) {
+    criterias = criterias.filter(([subType]) =>
+      recommendationSubTypes.includes(subType as RecommendationSubType),
+    );
   }
-});
 
-const getStockCriteria = (_settings: Settings) => ({
-  NO_STOCK: {
-    type: RecommendationType.STOCK,
-    filter: (node: ProductNode) => node.totalInventory === 0,
+  return criterias;
+}
+
+function getDefinitionCriteria(
+  settings: Settings,
+  recommendationSubTypes?: RecommendationSubType[],
+) {
+  let criterias = Object.entries({
+    NO_IMAGE: {
+      filter: (node: ProductNode) => node.featuredMedia === null,
+    },
+    SHORT_TITLE: {
+      filter: (node: ProductNode) =>
+        node.title.length < settings.shortTitleLength,
+    },
+    LONG_TITLE: {
+      filter: (node: ProductNode) =>
+        node.title.length > settings.longTitleLength,
+    },
+    SHORT_DESCRIPTION: {
+      filter: (node: ProductNode) =>
+        node.description.length < settings.shortDescriptionLength,
+    },
+    LONG_DESCRIPTION: {
+      filter: (node: ProductNode) =>
+        node.description.length > settings.longDescriptionLength,
+    },
+  });
+
+  if (recommendationSubTypes) {
+    criterias = criterias.filter(([subType]) =>
+      recommendationSubTypes.includes(subType as RecommendationSubType),
+    );
   }
-});
+
+  return criterias;
+}
+
+function getStockCriteria(
+  _settings: Settings,
+  recommendationSubTypes?: RecommendationSubType[],
+) {
+  let criterias = Object.entries({
+    NO_STOCK: {
+      type: RecommendationType.STOCK,
+      filter: (node: ProductNode) => node.totalInventory === 0,
+    },
+  });
+
+  if (recommendationSubTypes) {
+    criterias = criterias.filter(([subType]) =>
+      recommendationSubTypes.includes(subType as RecommendationSubType),
+    );
+  }
+
+  return criterias;
+}
 
 function findRecommendation(shop: string, id: string) {
   return db.recommendation.findFirst({
@@ -158,7 +199,12 @@ async function getProductRecommendations(
   graphql: AdminGraphqlClient,
   shop: string,
   settings: Settings,
+  recommendationSubTypes?: RecommendationSubType[],
 ) {
+  const definitionCriterias = getDefinitionCriteria(settings, recommendationSubTypes);
+  const stockCriterias = getStockCriteria(settings, recommendationSubTypes);
+  if (definitionCriterias.length === 0 && stockCriterias.length === 0) return [];
+
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
   let cursor = null;
@@ -168,41 +214,45 @@ async function getProductRecommendations(
 
     for (const { node } of edges) {
       // Check definition issues
-      const definitionIssues = Object.entries(getDefinitionCriteria(settings))
-        .filter(([, criteria]) => criteria.filter(node))
-        .map(([subType]) => subType as RecommendationSubType);
+      if (definitionCriterias.length > 0) {
+        const definitionIssues = definitionCriterias
+          .filter(([, criteria]) => criteria.filter(node))
+          .map(([subType]) => subType as RecommendationSubType);
 
-      if (definitionIssues.length > 0) {
-        recommendations.push({
-          shop,
-          targetType: TargetType.PRODUCT,
-          productId: node.id,
-          variantId: null,
-          targetTitle: node.title,
-          targetUrl: getProductUrlFromGid(node.id),
-          type: RecommendationType.DEFINITION,
-          subTypes: definitionIssues,
-          status: RecommendationStatus.PENDING,
-        });
+        if (definitionIssues.length > 0) {
+          recommendations.push({
+            shop,
+            targetType: TargetType.PRODUCT,
+            productId: node.id,
+            variantId: null,
+            targetTitle: node.title,
+            targetUrl: getProductUrlFromGid(node.id),
+            type: RecommendationType.DEFINITION,
+            subTypes: definitionIssues,
+            status: RecommendationStatus.PENDING,
+          });
+        }
       }
 
       // Check stock issues
-      const stockIssues = Object.entries(getStockCriteria(settings))
-        .filter(([, criteria]) => criteria.filter(node))
-        .map(([subType]) => subType as RecommendationSubType);
+      if (stockCriterias.length > 0) {
+        const stockIssues = stockCriterias
+          .filter(([, criteria]) => criteria.filter(node))
+          .map(([subType]) => subType as RecommendationSubType);
 
-      if (stockIssues.length > 0) {
-        recommendations.push({
-          shop,
-          targetType: TargetType.PRODUCT,
-          productId: node.id,
-          variantId: null,
-          targetTitle: node.title,
-          targetUrl: getProductUrlFromGid(node.id),
-          type: RecommendationType.STOCK,
-          subTypes: stockIssues,
-          status: RecommendationStatus.PENDING,
-        });
+        if (stockIssues.length > 0) {
+          recommendations.push({
+            shop,
+            targetType: TargetType.PRODUCT,
+            productId: node.id,
+            variantId: null,
+            targetTitle: node.title,
+            targetUrl: getProductUrlFromGid(node.id),
+            type: RecommendationType.STOCK,
+            subTypes: stockIssues,
+            status: RecommendationStatus.PENDING,
+          });
+        }
       }
     }
 
@@ -217,7 +267,10 @@ async function getProductVariantRecommendations(
   graphql: AdminGraphqlClient,
   shop: string,
   settings: Settings,
+  recommendationSubTypes?: RecommendationSubType[],
 ) {
+  const criterias = getPricingCriteria(settings, recommendationSubTypes);
+  if (criterias.length === 0) return [];
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
   let cursor = null;
@@ -227,7 +280,7 @@ async function getProductVariantRecommendations(
 
     for (const { node } of edges) {
       // Check pricing issues
-      const pricingIssues = Object.entries(getPricingCriteria(settings))
+      const pricingIssues = criterias
         .filter(([, criteria]) => criteria.filter(node))
         .map(([subType]) => subType as RecommendationSubType);
 
@@ -304,15 +357,21 @@ export async function getRecommendationCounts(
   );
 }
 
-export async function initializeAll(graphql: AdminGraphqlClient, shop: string) {
+export async function initializeAll(graphql: AdminGraphqlClient, shop: string, recommendationSubTypes?: RecommendationSubType[]) {
   const settings = await settingsBusiness.getShopSettings(shop);
 
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
-  const productReco = await getProductRecommendations(graphql, shop, settings);
+  const productReco = await getProductRecommendations(
+    graphql,
+    shop,
+    settings,
+    recommendationSubTypes,
+  );
   const variantReco = await getProductVariantRecommendations(
     graphql,
     shop,
     settings,
+    recommendationSubTypes,
   );
   recommendations.push(...productReco, ...variantReco);
 
@@ -320,6 +379,9 @@ export async function initializeAll(graphql: AdminGraphqlClient, shop: string) {
     where: {
       shop,
       status: RecommendationStatus.PENDING,
+      ...(recommendationSubTypes && {
+        subTypes: { hasSome: recommendationSubTypes },
+      }),
     },
   });
   if (recommendations.length > 0) {
@@ -460,4 +522,58 @@ export async function updateMedia(
 
 export function deleteRecommendations(shop: string) {
   return db.recommendation.deleteMany({ where: { shop } });
+}
+
+interface SettingsChanges {
+  pricing: {
+    minRevenueRate: boolean;
+    maxRevenueRate: boolean;
+    lowDiscountRate: boolean;
+    highDiscountRate: boolean;
+  };
+  content: {
+    shortTitle: boolean;
+    longTitle: boolean;
+    shortDescription: boolean;
+    longDescription: boolean;
+  };
+  inventory: {
+    understock: boolean;
+    overstock: boolean;
+    passive: boolean;
+  };
+}
+
+export async function updateRecommendationsForSettings(
+  graphql: AdminGraphqlClient,
+  shop: string,
+  changes: SettingsChanges,
+) {
+  // Collect all affected subtypes
+  const affectedSubTypes: RecommendationSubType[] = [];
+
+  // Pricing changes
+  if (Object.values(changes.pricing).some(Boolean)) {
+    if (changes.pricing.minRevenueRate) affectedSubTypes.push("CHEAP");
+    if (changes.pricing.maxRevenueRate) affectedSubTypes.push("EXPENSIVE");
+    if (changes.pricing.lowDiscountRate) affectedSubTypes.push("LOW_DISCOUNT");
+    if (changes.pricing.highDiscountRate) affectedSubTypes.push("HIGH_DISCOUNT");
+  }
+
+  // Content changes
+  if (Object.values(changes.content).some(Boolean)) {
+    if (changes.content.shortTitle) affectedSubTypes.push("SHORT_TITLE");
+    if (changes.content.longTitle) affectedSubTypes.push("LONG_TITLE");
+    if (changes.content.shortDescription) affectedSubTypes.push("SHORT_DESCRIPTION");
+    if (changes.content.longDescription) affectedSubTypes.push("LONG_DESCRIPTION");
+  }
+
+  // Inventory changes
+  if (Object.values(changes.inventory).some(Boolean)) {
+    if (changes.inventory.understock) affectedSubTypes.push("UNDERSTOCK");
+    if (changes.inventory.overstock) affectedSubTypes.push("OVERSTOCK");
+    if (changes.inventory.passive) affectedSubTypes.push("PASSIVE");
+  }
+
+  return initializeAll(graphql, shop, affectedSubTypes);
 }

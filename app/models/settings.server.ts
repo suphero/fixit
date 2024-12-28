@@ -11,6 +11,6 @@ export async function updateShopSettings(
   request: Request,
   settings: Partial<Settings>
 ): Promise<Settings> {
-  const { session } = await authenticate.admin(request);
-  return business.updateShopSettings(session.shop, settings);
+  const { admin, session } = await authenticate.admin(request);
+  return business.updateShopSettings(admin.graphql, session.shop, settings);
 }

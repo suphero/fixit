@@ -7,7 +7,7 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import { restResources } from "@shopify/shopify-api/rest/admin/2024-10";
 import prisma from "./db.server";
-import { updateShopSettings } from "./models/settings.business.server";
+import { createSettings } from "./models/settings.business.server";
 import { initializeAll } from "./models/recommendation.business.server";
 
 const shopify = shopifyApp({
@@ -19,7 +19,7 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   hooks: {
     afterAuth: async ({ admin, session }) => {
-      await updateShopSettings(session.shop, {});
+      await createSettings(session.shop);
       await initializeAll(admin.graphql, session.shop);
     },
   },

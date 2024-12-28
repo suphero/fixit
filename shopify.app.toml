@@ -11,7 +11,7 @@ handle = "dev-p-smart-forecast"
 scopes = "read_products, write_products, read_orders, read_inventory"
 
 [webhooks]
-api_version = "2024-07"
+api_version = "2024-10"
 
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/uninstalled"
