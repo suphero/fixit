@@ -5,8 +5,7 @@ import { deleteSettings } from "../models/settings.business.server";
 import { deleteSession } from "app/models/session.business.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { payload } = await authenticate.webhook(request);
-  const { shop_domain: shop } = payload;
+  const { shop } = await authenticate.webhook(request);
 
   try {
     await Promise.all([

@@ -2,8 +2,7 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { payload } = await authenticate.webhook(request);
-  const { shop_domain: shop } = payload;
+  const { shop } = await authenticate.webhook(request);
 
   try {
     console.log(`Customer data deletion request received for shop: ${shop}`);

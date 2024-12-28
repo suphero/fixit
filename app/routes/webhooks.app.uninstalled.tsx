@@ -5,9 +5,7 @@ import { deleteSettings } from "../models/settings.business.server";
 import { deleteSession } from "../models/session.business.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, session, topic } = await authenticate.webhook(request);
-
-  console.log(`Received ${topic} webhook for ${shop}`);
+  const { shop, session } = await authenticate.webhook(request);
 
   // Webhook requests can trigger multiple times and after an app has already been uninstalled.
   // If this webhook already ran, the session may have been deleted previously.
