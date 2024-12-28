@@ -32,6 +32,10 @@ import { UpdatePricingModal } from "./app.reco.update-pricing";
 
 type LoaderData = {
   shop: string;
+  shopData: {
+    currencyCode: string;
+    moneyFormat: string;
+  };
   counts: Record<RecommendationType, number>;
   settings: {
     shortTitleLength: number;
@@ -62,7 +66,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const size = Math.max(1, Number(url.searchParams.get("size") ?? PAGE_SIZE));
   const type = url.searchParams.get("type") as RecommendationType;
 
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+
+  // Fetch shop data
+  const response = await admin.graphql(
+    `#graphql
+    query getShop {
+      shop {
+        currencyCode
+        currencyFormats {
+          moneyFormat
+          moneyWithCurrencyFormat
+        }
+      }
+    }`
+  );
+  const { data } = await response.json();
+
   const [typeCounts, settings] = await Promise.all([
     getRecommendationCounts(request, "PENDING"),
     getShopSettings(request),
@@ -79,7 +99,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
     };
   }
 
-  return { shop: session.shop, counts: typeCounts, settings, activeTab };
+  return {
+    shop: session.shop,
+    shopData: {
+      currencyCode: data.shop.currencyCode,
+      moneyFormat: data.shop.currencyFormats.moneyFormat,
+    },
+    counts: typeCounts,
+    settings,
+    activeTab
+  };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -265,6 +294,7 @@ export default function Index() {
       <UpdatePricingModal
         recommendation={selectedPricingRecommendation}
         settings={data.settings}
+        shopData={data.shopData}
         onClose={() => setSelectedPricingRecommendation(null)}
       />
       <IndexTable
