@@ -45,3 +45,7 @@ export async function updateShopSettings(
     },
   });
 }
+
+export function deleteSettings(shop: string) {
+  return db.settings.deleteMany({ where: { shop } });
+}

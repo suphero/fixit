@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "d713d4c7b0fc50d65d4a1554ba059827"
-application_url = "https://anything-validity-legendary-executives.trycloudflare.com"
+application_url = "https://occasional-carefully-true-paths.trycloudflare.com"
 embedded = true
 name = "[DEV] Smart Forecast"
 handle = "dev-p-smart-forecast"
@@ -11,17 +11,29 @@ handle = "dev-p-smart-forecast"
 scopes = "read_products, write_products, read_orders, read_inventory"
 
 [webhooks]
-api_version = "2022-07"
+api_version = "2024-07"
 
   [[webhooks.subscriptions]]
-  uri = "https://b01c-176-41-143-213.ngrok.io/api/webhooks"
-  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/redact"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop/redact"
+  compliance_topics = [ "shop/redact" ]
 
 [auth]
 redirect_urls = [
-  "https://anything-validity-legendary-executives.trycloudflare.com/auth/callback",
-  "https://anything-validity-legendary-executives.trycloudflare.com/auth/shopify/callback",
-  "https://anything-validity-legendary-executives.trycloudflare.com/api/auth/callback"
+  "https://occasional-carefully-true-paths.trycloudflare.com/auth/callback",
+  "https://occasional-carefully-true-paths.trycloudflare.com/auth/shopify/callback",
+  "https://occasional-carefully-true-paths.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]

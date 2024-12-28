@@ -2,22 +2,22 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { deleteRecommendations } from "../models/recommendation.business.server";
 import { deleteSettings } from "../models/settings.business.server";
-import { deleteSession } from "../models/session.business.server";
+import { deleteSession } from "app/models/session.business.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, session, topic } = await authenticate.webhook(request);
+  const { payload } = await authenticate.webhook(request);
+  const { shop_domain: shop } = payload;
 
-  console.log(`Received ${topic} webhook for ${shop}`);
-
-  // Webhook requests can trigger multiple times and after an app has already been uninstalled.
-  // If this webhook already ran, the session may have been deleted previously.
-  if (session) {
+  try {
     await Promise.all([
       deleteRecommendations(shop),
       deleteSettings(shop),
       deleteSession(shop),
     ]);
-  }
 
-  return new Response();
+    return new Response(null, { status: 200 });
+  } catch (error) {
+    console.error("Shop redact webhook error:", error);
+    return new Response(null, { status: 200 });
+  }
 };

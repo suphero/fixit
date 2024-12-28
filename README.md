@@ -1,5 +1,15 @@
 # Shopify App Template - Remix
 
+## Key Operations
+
+### Trigger uninstall webhook
+
+```shell
+shopify app webhook trigger --api-version=2024-07 --topic=app/uninstalled --delivery-method=http --address=http://localhost:52170/webhooks/app/uninstalled
+```
+
+## Introduction
+
 This is a template for building a [Shopify app](https://shopify.dev/docs/apps/getting-started) using the [Remix](https://remix.run) framework.
 
 Rather than cloning this repo, you can use your preferred package manager and the Shopify CLI with [these steps](https://shopify.dev/docs/apps/getting-started/create).

@@ -457,3 +457,7 @@ export async function updateMedia(
     });
   }
 }
+
+export function deleteRecommendations(shop: string) {
+  return db.recommendation.deleteMany({ where: { shop } });
+}
