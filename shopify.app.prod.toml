@@ -1,0 +1,30 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "887110872f7dd4f2d175308b5bef27aa"
+application_url = "https://smart-forecast-app-gmi2a.ondigitalocean.app/"
+embedded = true
+name = "Smart Forecast"
+handle = "smart-forecast"
+
+[webhooks]
+api_version = "2022-07"
+
+  [[webhooks.subscriptions]]
+  uri = "https://3aqznhavx0.execute-api.us-east-1.amazonaws.com/webhooks/customers/data_request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "https://3aqznhavx0.execute-api.us-east-1.amazonaws.com/webhooks/customers/redact"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "https://3aqznhavx0.execute-api.us-east-1.amazonaws.com/webhooks/shop/redact"
+  compliance_topics = [ "shop/redact" ]
+
+[auth]
+redirect_urls = [
+  "https://smart-forecast-app-gmi2a.ondigitalocean.app/api/auth/callback"
+]
+
+[pos]
+embedded = false
