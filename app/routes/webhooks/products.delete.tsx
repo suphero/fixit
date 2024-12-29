@@ -10,15 +10,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await db.recommendation.deleteMany({
       where: {
         shop,
-        OR: [
-          { productId },
-          {
-            AND: [
-              { targetType: "PRODUCT_VARIANT" },
-              { productId },
-            ],
-          },
-        ],
+        productId,
       },
     });
 
