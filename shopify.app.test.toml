@@ -44,8 +44,6 @@ api_version = "2024-10"
 [auth]
 redirect_urls = [
   "https://smart-forecast-qa-app-9znnu.ondigitalocean.app/auth/callback",
-  "https://smart-forecast-qa-app-9znnu.ondigitalocean.app/auth/shopify/callback",
-  "https://smart-forecast-qa-app-9znnu.ondigitalocean.app/api/auth/callback"
 ]
 
 [pos]

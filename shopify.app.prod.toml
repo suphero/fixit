@@ -44,8 +44,6 @@ api_version = "2024-10"
 [auth]
 redirect_urls = [
   "https://smart-forecast-app-gmi2a.ondigitalocean.app/auth/callback",
-  "https://smart-forecast-app-gmi2a.ondigitalocean.app/auth/shopify/callback",
-  "https://smart-forecast-app-gmi2a.ondigitalocean.app/api/auth/callback"
 ]
 
 [pos]
