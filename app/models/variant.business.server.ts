@@ -31,11 +31,18 @@ export async function getDetails(graphql: AdminGraphqlClient, id: string) {
   };
 }
 
-export async function fetch(graphql: AdminGraphqlClient, cursor: string | null) {
+export async function fetchVariant(
+  graphql: AdminGraphqlClient,
+  params: { cursor: string | null; productId?: string },
+) {
+  let query = "status:active";
+  if (params.productId) {
+    query += ` AND product_id:${params.productId}`;
+  }
   const response = await graphql(
     `#graphql
-    query getProductVariants($cursor: String) {
-      productVariants(first: 50, after: $cursor, query: "status:active") {
+    query getProductVariants($cursor: String, $query: String) {
+      productVariants(first: 50, after: $cursor, query: $query) {
         edges {
           node {
             id
@@ -60,7 +67,7 @@ export async function fetch(graphql: AdminGraphqlClient, cursor: string | null) 
         }
       }
     }`,
-    { variables: { cursor } },
+    { variables: { cursor: params.cursor, query } },
   );
   const { data } = await response.json();
   return data.productVariants;

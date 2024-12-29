@@ -199,18 +199,31 @@ async function getProductRecommendations(
   graphql: AdminGraphqlClient,
   shop: string,
   settings: Settings,
-  recommendationSubTypes?: RecommendationSubType[],
+  params: {
+    productId?: string;
+    recommendationSubTypes?: RecommendationSubType[];
+  } = {},
 ) {
-  const definitionCriterias = getDefinitionCriteria(settings, recommendationSubTypes);
-  const stockCriterias = getStockCriteria(settings, recommendationSubTypes);
-  if (definitionCriterias.length === 0 && stockCriterias.length === 0) return [];
+  const definitionCriterias = getDefinitionCriteria(
+    settings,
+    params?.recommendationSubTypes,
+  );
+  const stockCriterias = getStockCriteria(
+    settings,
+    params?.recommendationSubTypes,
+  );
+  if (definitionCriterias.length === 0 && stockCriterias.length === 0)
+    return [];
 
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
   let cursor = null;
 
   while (hasNextPage) {
-    const { edges, pageInfo } = await productBusiness.fetchProduct(graphql, cursor);
+    const { edges, pageInfo } = await productBusiness.fetchProduct(graphql, {
+      cursor,
+      productId: params?.productId,
+    });
 
     for (const { node } of edges) {
       // Check definition issues
@@ -267,16 +280,25 @@ async function getProductVariantRecommendations(
   graphql: AdminGraphqlClient,
   shop: string,
   settings: Settings,
-  recommendationSubTypes?: RecommendationSubType[],
+  params: {
+    productId?: string;
+    recommendationSubTypes?: RecommendationSubType[];
+  } = {},
 ) {
-  const criterias = getPricingCriteria(settings, recommendationSubTypes);
+  const criterias = getPricingCriteria(
+    settings,
+    params?.recommendationSubTypes,
+  );
   if (criterias.length === 0) return [];
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
   let cursor = null;
 
   while (hasNextPage) {
-    const { edges, pageInfo } = await variantBusiness.fetch(graphql, cursor);
+    const { edges, pageInfo } = await variantBusiness.fetchVariant(graphql, {
+      cursor,
+      productId: params?.productId,
+    });
 
     for (const { node } of edges) {
       // Check pricing issues
@@ -357,7 +379,14 @@ export async function getRecommendationCounts(
   );
 }
 
-export async function initializeAll(graphql: AdminGraphqlClient, shop: string, recommendationSubTypes?: RecommendationSubType[]) {
+export async function initializeAll(
+  graphql: AdminGraphqlClient,
+  shop: string,
+  params: {
+    productId?: string;
+    recommendationSubTypes?: RecommendationSubType[];
+  } = {},
+) {
   const settings = await settingsBusiness.getShopSettings(shop);
 
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
@@ -365,13 +394,13 @@ export async function initializeAll(graphql: AdminGraphqlClient, shop: string, r
     graphql,
     shop,
     settings,
-    recommendationSubTypes,
+    params,
   );
   const variantReco = await getProductVariantRecommendations(
     graphql,
     shop,
     settings,
-    recommendationSubTypes,
+    params,
   );
   recommendations.push(...productReco, ...variantReco);
 
@@ -379,9 +408,10 @@ export async function initializeAll(graphql: AdminGraphqlClient, shop: string, r
     where: {
       shop,
       status: RecommendationStatus.PENDING,
-      ...(recommendationSubTypes && {
-        subTypes: { hasSome: recommendationSubTypes },
+      ...(params?.recommendationSubTypes && {
+        subTypes: { hasSome: params?.recommendationSubTypes },
       }),
+      ...(params?.productId && { productId: params?.productId }),
     },
   });
   if (recommendations.length > 0) {
@@ -550,30 +580,30 @@ export async function updateRecommendationsForSettings(
   changes: SettingsChanges,
 ) {
   // Collect all affected subtypes
-  const affectedSubTypes: RecommendationSubType[] = [];
+  const recommendationSubTypes: RecommendationSubType[] = [];
 
   // Pricing changes
   if (Object.values(changes.pricing).some(Boolean)) {
-    if (changes.pricing.minRevenueRate) affectedSubTypes.push("CHEAP");
-    if (changes.pricing.maxRevenueRate) affectedSubTypes.push("EXPENSIVE");
-    if (changes.pricing.lowDiscountRate) affectedSubTypes.push("LOW_DISCOUNT");
-    if (changes.pricing.highDiscountRate) affectedSubTypes.push("HIGH_DISCOUNT");
+    if (changes.pricing.minRevenueRate) recommendationSubTypes.push("CHEAP");
+    if (changes.pricing.maxRevenueRate) recommendationSubTypes.push("EXPENSIVE");
+    if (changes.pricing.lowDiscountRate) recommendationSubTypes.push("LOW_DISCOUNT");
+    if (changes.pricing.highDiscountRate) recommendationSubTypes.push("HIGH_DISCOUNT");
   }
 
   // Content changes
   if (Object.values(changes.content).some(Boolean)) {
-    if (changes.content.shortTitle) affectedSubTypes.push("SHORT_TITLE");
-    if (changes.content.longTitle) affectedSubTypes.push("LONG_TITLE");
-    if (changes.content.shortDescription) affectedSubTypes.push("SHORT_DESCRIPTION");
-    if (changes.content.longDescription) affectedSubTypes.push("LONG_DESCRIPTION");
+    if (changes.content.shortTitle) recommendationSubTypes.push("SHORT_TITLE");
+    if (changes.content.longTitle) recommendationSubTypes.push("LONG_TITLE");
+    if (changes.content.shortDescription) recommendationSubTypes.push("SHORT_DESCRIPTION");
+    if (changes.content.longDescription) recommendationSubTypes.push("LONG_DESCRIPTION");
   }
 
   // Inventory changes
   if (Object.values(changes.inventory).some(Boolean)) {
-    if (changes.inventory.understock) affectedSubTypes.push("UNDERSTOCK");
-    if (changes.inventory.overstock) affectedSubTypes.push("OVERSTOCK");
-    if (changes.inventory.passive) affectedSubTypes.push("PASSIVE");
+    if (changes.inventory.understock) recommendationSubTypes.push("UNDERSTOCK");
+    if (changes.inventory.overstock) recommendationSubTypes.push("OVERSTOCK");
+    if (changes.inventory.passive) recommendationSubTypes.push("PASSIVE");
   }
 
-  return initializeAll(graphql, shop, affectedSubTypes);
+  return initializeAll(graphql, shop, { recommendationSubTypes });
 }

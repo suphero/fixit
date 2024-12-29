@@ -60,12 +60,16 @@ export async function updateProduct(
 
 export async function fetchProduct(
   graphql: AdminGraphqlClient,
-  cursor: string | null,
+  params: { cursor: string | null, productId?: string}
 ) {
+  let query = "status:active";
+  if (params.productId) {
+    query += ` AND id:${params.productId}`;
+  }
   const response = await graphql(
     `#graphql
-    query getProducts($cursor: String) {
-      products(first: 50, after: $cursor, query: "status:active") {
+    query getProducts($cursor: String, $query: String) {
+      products(first: 50, after: $cursor, query: $query) {
         edges {
           node {
             id
@@ -83,7 +87,7 @@ export async function fetchProduct(
         }
       }
     }`,
-    { variables: { cursor } },
+    { variables: { cursor: params.cursor, query } },
   );
   const { data } = await response.json();
   return data.products;
