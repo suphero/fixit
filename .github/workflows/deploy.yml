@@ -36,8 +36,7 @@ jobs:
           command: c
           cwd: "./"
           files: |
-            backend/
-            frontend/dist/
+            build/
             captain-definition
           outPath: deploy.tar
 
