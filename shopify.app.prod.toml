@@ -6,25 +6,51 @@ embedded = true
 name = "Smart Forecast"
 handle = "smart-forecast"
 
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_products, write_products, read_orders, read_inventory"
+
 [webhooks]
-api_version = "2022-07"
+api_version = "2024-10"
 
   [[webhooks.subscriptions]]
-  uri = "https://3aqznhavx0.execute-api.us-east-1.amazonaws.com/webhooks/customers/data_request"
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
   compliance_topics = [ "customers/data_request" ]
 
   [[webhooks.subscriptions]]
-  uri = "https://3aqznhavx0.execute-api.us-east-1.amazonaws.com/webhooks/customers/redact"
+  uri = "/webhooks/customers/redact"
   compliance_topics = [ "customers/redact" ]
 
   [[webhooks.subscriptions]]
-  uri = "https://3aqznhavx0.execute-api.us-east-1.amazonaws.com/webhooks/shop/redact"
+  uri = "/webhooks/shop/redact"
   compliance_topics = [ "shop/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/products/create"
+  topics = [ "products/create" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/products/update"
+  topics = [ "products/update" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/products/delete"
+  topics = [ "products/delete" ]
 
 [auth]
 redirect_urls = [
+  "https://smart-forecast-app-gmi2a.ondigitalocean.app/auth/callback",
+  "https://smart-forecast-app-gmi2a.ondigitalocean.app/auth/shopify/callback",
   "https://smart-forecast-app-gmi2a.ondigitalocean.app/api/auth/callback"
 ]
 
 [pos]
 embedded = false
+
+[build]
+dev_store_url = "smart-forecast-demo.myshopify.com"
+include_config_on_deploy = true
