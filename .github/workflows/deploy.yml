@@ -39,6 +39,12 @@ jobs:
         file: ./Dockerfile
         push: true
         tags: ${{ env.IMAGE_URL }}
+    - name: Debug Inputs
+      run: |
+        echo "Server: ${{ env.CAPROVER_SERVER }}"
+        echo "App: ${{ env.CAPROVER_APP_NAME }}"
+        echo "Token: ${{ secrets.CAPROVER_APP_TOKEN }}"
+        echo "Image URL: ${{ env.IMAGE_URL }}"
 
     - name: Deploy Image to CapRrover
       uses: caprover/deploy-from-github@v1.1.2
