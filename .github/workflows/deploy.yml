@@ -29,7 +29,7 @@ jobs:
         run: |
           currentBranch=$(git branch --show-current || echo "master")
           caprover deploy \
-            --caproverUrl $CAPROVER_SERVER \
-            --appName $CAPROVER_APP \
-            --appToken $CAPROVER_APP_TOKEN \
-            --branch $currentBranch
+            --caproverUrl "$CAPROVER_SERVER" \
+            --appName "$CAPROVER_APP" \
+            --appToken "$CAPROVER_APP_TOKEN" \
+            --branch "$currentBranch"
