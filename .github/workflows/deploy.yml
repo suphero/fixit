@@ -23,13 +23,13 @@ jobs:
 
       - name: Deploy with CapRover CLI
         env:
-          CAPROVER_SERVER: ${{ vars.CAPROVER_SERVER }}
+          CAPROVER_URL: ${{ vars.CAPROVER_URL }}
           CAPROVER_APP: ${{ vars.CAPROVER_APP }}
           CAPROVER_APP_TOKEN: ${{ secrets.CAPROVER_APP_TOKEN }}
         run: |
           currentBranch=$(git branch --show-current || echo "master")
           caprover deploy \
-            --caproverUrl "$CAPROVER_SERVER" \
+            --caproverUrl "$CAPROVER_URL" \
             --appName "$CAPROVER_APP" \
             --appToken "$CAPROVER_APP_TOKEN" \
             --branch "$currentBranch"
