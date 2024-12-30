@@ -39,29 +39,11 @@ jobs:
         file: ./Dockerfile
         push: true
         tags: ${{ env.IMAGE_URL }}
-    - name: Debug Inputs
-      run: |
-        echo "Server: $CAPROVER_SERVER"
-        echo "env.CAPROVER_SERVER: ${{ env.CAPROVER_SERVER }}"
-        echo "vars.CAPROVER_SERVER: ${{ vars.CAPROVER_SERVER }}"
-        echo "secrets.CAPROVER_SERVER: ${{ secrets.CAPROVER_SERVER }}"
-
-        echo "App: $CAPROVER_APP_NAME"
-        echo "env.CAPROVER_APP_NAME: ${{ env.CAPROVER_APP_NAME }}"
-        echo "vars.CAPROVER_APP_NAME: ${{ vars.CAPROVER_APP_NAME }}"
-        echo "secrets.CAPROVER_APP_NAME: ${{ secrets.CAPROVER_APP_NAME }}"
-
-        echo "Token: $CAPROVER_APP_TOKEN"
-        echo "env.CAPROVER_APP_TOKEN: ${{ env.CAPROVER_APP_TOKEN }}"
-        echo "vars.CAPROVER_APP_TOKEN: ${{ vars.CAPROVER_APP_TOKEN }}"
-        echo "secrets.CAPROVER_APP_TOKEN: ${{ secrets.CAPROVER_APP_TOKEN }}"
-
-        echo "Image URL: ${{ env.IMAGE_URL }}"
 
     - name: Deploy Image to CapRrover
       uses: caprover/deploy-from-github@v1.1.2
       with:
-        server: "${{ env.CAPROVER_SERVER }}"
-        app: "${{ env.CAPROVER_APP_NAME }}"
+        server: "${{ vars.CAPROVER_SERVER }}"
+        app: "${{ vars.CAPROVER_APP_NAME }}"
         token: "${{ secrets.CAPROVER_APP_TOKEN }}"
         image: ${{ env.IMAGE_URL }}
