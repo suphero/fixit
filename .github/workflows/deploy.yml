@@ -7,6 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: test
 
     steps:
       - name: Checkout code
@@ -22,8 +23,8 @@ jobs:
 
       - name: Deploy with CapRover CLI
         env:
-          CAPROVER_SERVER: ${{ secrets.CAPROVER_SERVER }}
-          CAPROVER_APP_NAME: ${{ secrets.CAPROVER_APP_NAME }}
+          CAPROVER_SERVER: ${{ vars.CAPROVER_SERVER }}
+          CAPROVER_APP_NAME: ${{ vars.CAPROVER_APP_NAME }}
           CAPROVER_APP_TOKEN: ${{ secrets.CAPROVER_APP_TOKEN }}
         run: |
           currentBranch=$(git branch --show-current || echo "master")
