@@ -7,7 +7,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: test
+    environment: ${{ github.ref_name == 'master' && 'prod' || 'test' }}
 
     steps:
       - name: Checkout code
