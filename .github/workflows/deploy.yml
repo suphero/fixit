@@ -43,7 +43,7 @@ jobs:
     - name: Deploy Image to CapRrover
       uses: caprover/deploy-from-github@v1.1.2
       with:
-        server: "${{ vars.CAPROVER_SERVER }}"
-        app: "smart-forecast-test"
+        server: "${{ secrets.CAPROVER_SERVER }}"
+        app: "${{ secrets.CAPROVER_APP_NAME }}"
         token: "${{ secrets.CAPROVER_APP_TOKEN }}"
         image: ${{ env.IMAGE_URL }}
