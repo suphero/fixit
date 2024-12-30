@@ -41,8 +41,12 @@ jobs:
         tags: ${{ env.IMAGE_URL }}
     - name: Debug Inputs
       run: |
-        echo "Server: ${{ env.CAPROVER_SERVER }}"
-        echo "App: ${{ env.CAPROVER_APP_NAME }}"
+        echo "Server: $CAPROVER_SERVER"
+        echo "env.CAPROVER_SERVER: ${{ env.CAPROVER_SERVER }}"
+        echo "vars.CAPROVER_SERVER: ${{ vars.CAPROVER_SERVER }}"
+        echo "App: $CAPROVER_APP_NAME"
+        echo "env.CAPROVER_APP_NAME: ${{ env.CAPROVER_APP_NAME }}"
+        echo "vars.CAPROVER_APP_NAME: ${{ vars.CAPROVER_APP_NAME }}"
         echo "Token: ${{ secrets.CAPROVER_APP_TOKEN }}"
         echo "Image URL: ${{ env.IMAGE_URL }}"
 
