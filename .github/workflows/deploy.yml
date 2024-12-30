@@ -1,49 +1,34 @@
-name: Build & Deploy Docker Image
+name: Deploy to CapRover
 
 on:
   push:
     branches: [ "release", "master" ]
 
-  pull_request:
-    branches: [ "release", "master" ]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Check out repository
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
 
-    - name: Login to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.GHCR_TOKEN }}
+      - name: Install CapRover CLI
+        run: npm install -g caprover
 
-    - name: Preset Image Name
-      run: echo "IMAGE_URL=$(echo ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:$(echo ${{ github.sha }} | cut -c1-7) | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
-    - name: Build and push Docker Image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile
-        push: true
-        tags: ${{ env.IMAGE_URL }}
-
-    - name: Deploy Image to CapRrover
-      uses: caprover/deploy-from-github@v1.1.2
-      with:
-        server: "${{ secrets.CAPROVER_SERVER }}"
-        app: "${{ secrets.CAPROVER_APP_NAME }}"
-        token: "${{ secrets.CAPROVER_APP_TOKEN }}"
-        image: ${{ env.IMAGE_URL }}
+      - name: Deploy with CapRover CLI
+        env:
+          CAPROVER_SERVER: ${{ secrets.CAPROVER_SERVER }}
+          CAPROVER_APP_NAME: ${{ secrets.CAPROVER_APP_NAME }}
+          CAPROVER_APP_TOKEN: ${{ secrets.CAPROVER_APP_TOKEN }}
+        run: |
+          currentBranch=$(git branch --show-current || echo "master")
+          caprover deploy \
+            --caproverUrl $CAPROVER_SERVER \
+            --appName $CAPROVER_APP_NAME \
+            --appToken $CAPROVER_APP_TOKEN \
+            --branch $currentBranch
