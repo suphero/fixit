@@ -1,6 +1,9 @@
 FROM node:18-alpine
 
-RUN apt-get update -y && apt-get install -y openssl
+RUN set -ex; \
+  apk update; \
+  apk add --no-cache \
+  openssl
 
 ENV PORT=3000
 
