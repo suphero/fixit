@@ -7,16 +7,11 @@ import { deleteSession } from "../models/session.business.server";
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop } = await authenticate.webhook(request);
 
-  try {
-    await Promise.all([
-      deleteRecommendations(shop),
-      deleteSettings(shop),
-      deleteSession(shop),
-    ]);
+  await Promise.all([
+    deleteRecommendations(shop),
+    deleteSettings(shop),
+    deleteSession(shop),
+  ]);
 
-    return new Response(null, { status: 200 });
-  } catch (error) {
-    console.error("Shop redact webhook error:", error);
-    return new Response(null, { status: 200 });
-  }
+  return new Response(null, { status: 200 });
 };
