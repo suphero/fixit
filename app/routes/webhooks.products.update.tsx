@@ -8,12 +8,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return new Response(null, { status: 200 });
   }
 
-  try {
-    const productId = `gid://shopify/Product/${payload.id}`;
-    await initializeAll(admin.graphql, shop, { productId });
-    return new Response(null, { status: 200 });
-  } catch (error) {
-    console.error("Product create webhook error:", error);
-    return new Response(null, { status: 200 });
-  }
+  const productId = `gid://shopify/Product/${payload.id}`;
+  await initializeAll(admin.graphql, shop, { productId });
+  return new Response(null, { status: 200 });
 };
