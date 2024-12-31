@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { RecommendationStatus } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 
@@ -11,6 +12,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       where: {
         shop,
         productId,
+        status: RecommendationStatus.PENDING
       },
     });
 
