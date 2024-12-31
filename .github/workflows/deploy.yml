@@ -36,7 +36,7 @@ jobs:
 
       - name: Deploy Shopify
         env:
+          SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           CONFIG_FILE: ${{ github.ref_name == 'master' && 'shopify.app.prod.toml' || 'shopify.app.test.toml' }}
-        run: |
-          shopify app config use $CONFIG_FILE
-          shopify app deploy
+        run: shopify app deploy -f --source-control-url "$COMMIT_URL"
