@@ -1,5 +1,12 @@
 FROM node:18-alpine
 
+RUN set -ex; \
+  apk update; \
+  apk add --no-cache \
+  openssl
+
+ENV PORT=3000
+
 EXPOSE 3000
 
 WORKDIR /app
