@@ -4,7 +4,7 @@ import { useFetcher } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { getDetails } from "../models/variant.server";
-import { updatePricing } from "app/models/recommendation.server";
+import { updatePricing } from "../models/recommendation.server";
 import { parseMoneyFormat, formatMoney } from "../utils/money";
 
 interface UpdatePricingModalProps {

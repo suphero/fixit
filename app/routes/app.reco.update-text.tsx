@@ -4,7 +4,7 @@ import { useFetcher } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { updateText } from "../models/recommendation.server";
-import { getDetails } from "app/models/product.server";
+import { getDetails } from "../models/product.server";
 
 interface UpdateTextModalProps {
   recommendation: Recommendation | null;
