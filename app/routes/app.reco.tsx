@@ -23,7 +23,7 @@ import {
   getRecommendationCounts,
   getRecommendationsByType,
 } from "../models/recommendation.server";
-import { TAB_DEFINITIONS, getSubTypeDefinition } from "app/constants/recommendations";
+import { TAB_DEFINITIONS, getSubTypeDefinition } from "../constants/recommendations";
 import { getShopSettings } from "../models/settings.server";
 import { getShopifyAdminUrl } from "../utils/url";
 import { UpdateTextModal } from "./app.reco.update-text";
