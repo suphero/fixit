@@ -155,15 +155,16 @@ export function UpdatePricingModal({ recommendation, settings, shopData, onClose
           if (!recommendation) {
             throw new Error('Recommendation is required');
           }
-          submitFetcher.submit(
-            {
-              recommendationId: recommendation.id,
-              cost,
-              price,
-              compareAtPrice,
-            },
-            { method: 'post' }
-          );
+          const formData = new FormData();
+          formData.append('recommendationId', recommendation.id);
+          formData.append('cost', cost);
+          formData.append('price', price);
+          formData.append('compareAtPrice', compareAtPrice);
+
+          submitFetcher.submit(formData, {
+            method: 'post',
+            action: '/app/reco/update-pricing'
+          });
         },
         loading: submitFetcher.state === 'submitting',
         disabled: error.hasError || isLoading,

@@ -57,7 +57,10 @@ export function UpdateMediaModal({ recommendation, onClose }: UpdateMediaModalPr
           formData.append('recommendationId', recommendation.id);
           formData.append('image', files[0]);
 
-          submitFetcher.submit(formData, { method: 'post' });
+          submitFetcher.submit(formData, {
+            method: 'post',
+            action: '/app/reco/update-media'
+          });
         },
         loading: submitFetcher.state === 'submitting',
         disabled: !isValid,
