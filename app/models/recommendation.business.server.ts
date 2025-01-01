@@ -337,7 +337,7 @@ async function getProductVariantRecommendations(
   return recommendations;
 }
 
-export async function getRecommendationsByType(
+export function getRecommendationsByType(
   shop: string,
   type: RecommendationType,
   status: RecommendationStatus,

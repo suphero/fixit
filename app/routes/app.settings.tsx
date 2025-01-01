@@ -56,7 +56,7 @@ export default function Settings() {
     setFormValues(prev => ({ ...prev, [id]: value }));
   }, []);
 
-  const formatPercent = (value: number) => `${(value * 100).toFixed(0)}%`;
+  const formatPercent = (value: number) => `${(value).toFixed(0)}%`;
 
   const calculatePrice = (basePrice: number, rate: number, isDiscount = false) => {
     return isDiscount

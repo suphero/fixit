@@ -104,7 +104,10 @@ export function UpdateTextModal({ recommendation, settings, onClose }: UpdateTex
           formData.append('title', title);
           formData.append('description', descriptionHtml);
 
-          submitFetcher.submit(formData, { method: 'post' });
+          submitFetcher.submit(formData, {
+            method: 'post',
+            action: '/app/reco/update-text'
+          });
         },
         loading: submitFetcher.state === 'submitting',
         disabled: !isValid || isLoading,
