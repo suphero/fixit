@@ -67,7 +67,7 @@ export async function updateShopSettings(
 
   // Update recommendations based on changed settings
   if (Object.values(changes).some(values => Object.values(values).some(Boolean))) {
-    await updateRecommendationsForSettings(graphql, shop, changes);
+    await updateRecommendationsForSettings(shop, changes);
   }
 
   return newSettings;

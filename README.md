@@ -5,7 +5,7 @@
 ### Trigger uninstall webhook
 
 ```shell
-shopify app webhook trigger --api-version=2024-07 --topic=app/uninstalled --delivery-method=http --address=http://localhost:52170/webhooks/app/uninstalled
+shopify app webhook trigger --api-version=2024-10 --topic=app/uninstalled --delivery-method=http --address=http://localhost:52170/webhooks/app/uninstalled
 ```
 
 ## Introduction
