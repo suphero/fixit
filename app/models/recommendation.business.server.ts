@@ -13,6 +13,7 @@ import db from "../db.server";
 import * as productBusiness from "./product.business.server";
 import * as variantBusiness from "./variant.business.server";
 import * as settingsBusiness from "./settings.business.server";
+import { publish } from "../consumers/generate-reco.server";
 
 type ProductVariantNode = {
   id: string;
@@ -379,7 +380,7 @@ export async function getRecommendationCounts(
   );
 }
 
-export async function initializeAll(
+export async function generateRecommendations(
   graphql: AdminGraphqlClient,
   shop: string,
   params: {
@@ -574,8 +575,7 @@ interface SettingsChanges {
   };
 }
 
-export async function updateRecommendationsForSettings(
-  graphql: AdminGraphqlClient,
+export function updateRecommendationsForSettings(
   shop: string,
   changes: SettingsChanges,
 ) {
@@ -605,5 +605,5 @@ export async function updateRecommendationsForSettings(
     if (changes.inventory.passive) recommendationSubTypes.push("PASSIVE");
   }
 
-  return initializeAll(graphql, shop, { recommendationSubTypes });
+  return publish(shop, { recommendationSubTypes });
 }
