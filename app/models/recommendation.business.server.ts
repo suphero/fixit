@@ -388,6 +388,7 @@ export async function generateRecommendations(
     recommendationSubTypes?: RecommendationSubType[];
   } = {},
 ) {
+  console.info("Generating recommendations", { shop, params });
   const settings = await settingsBusiness.getShopSettings(shop);
 
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
