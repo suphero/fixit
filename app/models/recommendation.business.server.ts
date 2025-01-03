@@ -13,7 +13,7 @@ import db from "../db.server";
 import * as productBusiness from "./product.business.server";
 import * as variantBusiness from "./variant.business.server";
 import * as settingsBusiness from "./settings.business.server";
-import { publish } from "../consumers/generate-reco.server";
+import { publish } from "../queues/generate-reco.server";
 
 type ProductVariantNode = {
   id: string;

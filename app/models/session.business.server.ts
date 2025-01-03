@@ -7,3 +7,12 @@ export function deleteSession(shop: string) {
 export function getAllSessions() {
   return db.session.findMany();
 }
+
+export function updateScope(id: string, current: string[]) {
+  return db.session.update({
+    where: { id },
+    data: {
+      scope: current.toString(),
+    },
+  });
+}
