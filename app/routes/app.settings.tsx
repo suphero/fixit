@@ -10,10 +10,13 @@ import {
   Box,
   InlineGrid,
   Divider,
+  Button,
+  InlineStack,
 } from "@shopify/polaris";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import { getShopSettings, updateShopSettings } from "../models/settings.server";
+import { initializeAll } from "../models/recommendation.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const settings = await getShopSettings(request);
@@ -22,25 +25,36 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
-  const updates = {
-    // Pricing
-    minRevenueRate: Number(formData.get("minRevenueRate")),
-    maxRevenueRate: Number(formData.get("maxRevenueRate")),
-    lowDiscountRate: Number(formData.get("lowDiscountRate")),
-    highDiscountRate: Number(formData.get("highDiscountRate")),
-    // Content
-    shortTitleLength: Number(formData.get("shortTitleLength")),
-    longTitleLength: Number(formData.get("longTitleLength")),
-    shortDescriptionLength: Number(formData.get("shortDescriptionLength")),
-    longDescriptionLength: Number(formData.get("longDescriptionLength")),
-    // Inventory
-    understockDays: Number(formData.get("understockDays")),
-    overstockDays: Number(formData.get("overstockDays")),
-    passiveDays: Number(formData.get("passiveDays")),
-  };
+  const action = formData.get("action");
 
-  await updateShopSettings(request, updates);
-  return { success: true };
+  switch (action) {
+    case "reinitialize":
+      await initializeAll(request);
+      return { success: true };
+    case "submit": {
+      const updates = {
+        // Pricing
+        minRevenueRate: Number(formData.get("minRevenueRate")),
+        maxRevenueRate: Number(formData.get("maxRevenueRate")),
+        lowDiscountRate: Number(formData.get("lowDiscountRate")),
+        highDiscountRate: Number(formData.get("highDiscountRate")),
+        // Content
+        shortTitleLength: Number(formData.get("shortTitleLength")),
+        longTitleLength: Number(formData.get("longTitleLength")),
+        shortDescriptionLength: Number(formData.get("shortDescriptionLength")),
+        longDescriptionLength: Number(formData.get("longDescriptionLength")),
+        // Inventory
+        understockDays: Number(formData.get("understockDays")),
+        overstockDays: Number(formData.get("overstockDays")),
+        passiveDays: Number(formData.get("passiveDays")),
+      };
+
+      await updateShopSettings(request, updates);
+      return { success: true };
+    }
+    default:
+      throw new Error(`Invalid action: ${action}`);
+  }
 }
 
 export default function Settings() {
@@ -49,7 +63,7 @@ export default function Settings() {
   const [formValues, setFormValues] = useState(settings);
 
   const handleSubmit = useCallback(() => {
-    fetcher.submit(formValues, { method: "post" });
+    fetcher.submit({...formValues, action: 'submit' }, { method: "post" });
   }, [formValues]);
 
   const handleChange = useCallback((value: string, id: string) => {
@@ -269,6 +283,30 @@ export default function Settings() {
                   </InlineGrid>
                 </BlockStack>
               </Box>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+
+        <Layout.Section>
+          <Card roundedAbove="sm">
+            <BlockStack gap="200">
+              <Text as="h2" variant="headingSm">Recommendations</Text>
+              <Box paddingBlockStart="200">
+                <Text as="p" variant="bodyMd">
+                  Reinitialize all recommendations based on the settings above.
+                </Text>
+              </Box>
+              <InlineStack align="end">
+                <Button
+                  variant="secondary"
+                  tone="critical"
+                  onClick={() => fetcher.submit({ action: 'reinitialize' }, { method: "post" })}
+                  loading={fetcher.state === "submitting" }
+                  accessibilityLabel="Reinitialize"
+                >
+                  Reinitialize
+                </Button>
+              </InlineStack>
             </BlockStack>
           </Card>
         </Layout.Section>

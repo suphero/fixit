@@ -14,12 +14,11 @@ import {
   ProductIcon,
   VariantIcon,
 } from "@shopify/polaris-icons";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import type { LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import type { Recommendation, RecommendationSubType, RecommendationType } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import {
-  initializeAll,
   getRecommendationCounts,
   getRecommendationsByType,
 } from "../models/recommendation.server";
@@ -109,38 +108,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
     settings,
     activeTab
   };
-}
-
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData();
-  const action = formData.get("action");
-
-  const { session } = await authenticate.admin(request);
-
-  switch (action) {
-    case "initialize":
-      await initializeAll(request);
-      const [counts, settings] = await Promise.all([
-        getRecommendationCounts(request, "PENDING"),
-        getShopSettings(request),
-      ]);
-      const firstType = Object.keys(counts).find(
-        (type) => counts[type as RecommendationType] > 0
-      ) as RecommendationType;
-      let activeTab = null;
-      if (firstType) {
-        const data = await getRecommendationsByType(request, firstType, "PENDING", 1, PAGE_SIZE);
-        activeTab = {
-          type: firstType,
-          count: counts[firstType],
-          data,
-          subTypes: TAB_DEFINITIONS[firstType].subTypes,
-        };
-      }
-      return { shop: session.shop, counts, settings, activeTab };
-    default:
-      throw new Error(`Invalid action: ${action}`);
-  }
 }
 
 export default function Index() {
@@ -246,27 +213,14 @@ export default function Index() {
 
   if (tabs.length === 0) {
     return (
-      <Page
-        title="Recommendations"
-        primaryAction={{
-          content: "Initialize",
-          onAction: () => fetcher.submit({ action: 'initialize' }, { method: "post" }),
-          loading: fetcher.state === "submitting",
-        }}>
+      <Page title="Recommendations">
         <Text as="span">No recommendations available.</Text>
       </Page>
     );
   }
 
   return (
-    <Page
-      title="Recommendations"
-      primaryAction={{
-        content: "Initialize",
-        onAction: () => fetcher.submit({ action: 'initialize' }, { method: "post" }),
-        loading: fetcher.state === "submitting",
-      }}
-    >
+    <Page title="Recommendations">
       <IndexFilters
         tabs={tabs}
         selected={selectedTab}
