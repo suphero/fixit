@@ -17,6 +17,8 @@ export async function getRabbitMQConnection(): Promise<amqp.Connection> {
     connection = await amqp.connect(url);
     console.log("RabbitMQ connected successfully");
 
+    await startQueueConsumers();
+
     // Handle connection close gracefully
     connection.on("close", () => {
       console.error("RabbitMQ connection closed");
@@ -27,8 +29,6 @@ export async function getRabbitMQConnection(): Promise<amqp.Connection> {
     connection.on("error", (error) => {
       console.error("RabbitMQ connection error:", error);
     });
-
-    await startQueueConsumers();
   }
   return connection;
 }
