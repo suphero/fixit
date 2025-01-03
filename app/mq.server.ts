@@ -1,6 +1,7 @@
 import amqp from "amqplib";
-import * as deleteShopConsumer from "./consumers/delete-shop.server";
-import * as generateRecoConsumer from "./consumers/generate-reco.server";
+import * as deleteShopConsumer from "./queues/delete-shop.server";
+import * as generateRecoConsumer from "./queues/generate-reco.server";
+import * as scopesUpdateConsumer from "./queues/scopes-update.server";
 
 declare global {
   var rabbitmqConnection: amqp.Connection | undefined;
@@ -60,12 +61,13 @@ export async function consumeFromQueue(
   console.log(`Started consuming from queue "${queue}"`);
 }
 
-type RABBITMQ_QUEUE = "delete_shop" | "generate_reco";
+type RABBITMQ_QUEUE = "delete_shop" | "generate_reco" | "scopes_update";
 
 async function startQueueConsumers() {
   try {
     await deleteShopConsumer.consume();
     await generateRecoConsumer.consume();
+    await scopesUpdateConsumer.consume();
     console.log('Queue consumers started successfully');
   } catch (error) {
     console.error('Error starting queue consumers:', error);
