@@ -1,7 +1,7 @@
 import type { RecommendationStatus , RecommendationType } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import * as business from "./recommendation.business.server";
-import { publish } from "../queues/generate-reco.server";
+import { publish } from "../consumers/generate-reco.server";
 
 export async function getRecommendationsByType(
   request: Request,

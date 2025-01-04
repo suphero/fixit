@@ -7,7 +7,7 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 import { createSettings } from "./models/settings.business.server";
-import { publish } from "./queues/generate-reco.server";
+import { publish } from "./consumers/generate-reco.server";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,

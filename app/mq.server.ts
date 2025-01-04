@@ -1,7 +1,7 @@
 import amqp from "amqplib";
-import * as deleteShopConsumer from "./queues/delete-shop.server";
-import * as generateRecoConsumer from "./queues/generate-reco.server";
-import * as scopesUpdateConsumer from "./queues/scopes-update.server";
+import * as deleteShopConsumer from "./consumers/delete-shop.server";
+import * as generateRecoConsumer from "./consumers/generate-reco.server";
+import * as scopesUpdateConsumer from "./consumers/scopes-update.server";
 
 declare global {
   var rabbitmqConnection: amqp.Connection | undefined;
