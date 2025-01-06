@@ -41,8 +41,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const handle = data.app.handle;
   const shopId = session.shop.replace(".myshopify.com", "");
   const planName = hasActivePayment ? "Premium" : "Free";
+  const pricingPlanUrl = `https://admin.shopify.com/store/${shopId}/charges/${handle}/pricing_plans`;
 
-  return { settings, planName, shop: shopId, handle };
+  return { settings, planName, pricingPlanUrl };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -80,7 +81,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Settings() {
-  const { settings, planName, shop, handle } = useLoaderData<typeof loader>();
+  const { settings, planName, pricingPlanUrl } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const [formValues, setFormValues] = useState(settings);
 
@@ -101,9 +102,7 @@ export default function Settings() {
   };
 
   const handleManagePricing = () => {
-    window?.top?.location.replace(
-      `https://admin.shopify.com/store/${shop}/charges/${handle}/pricing_plans`
-    );
+    window?.top?.location.replace(pricingPlanUrl);
   };
 
   return (
