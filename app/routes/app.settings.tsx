@@ -17,10 +17,32 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import { getShopSettings, updateShopSettings } from "../models/settings.server";
 import { initializeAll } from "../models/recommendation.server";
+import { authenticate, PREMIUM_PLAN } from "../shopify.server";
+import { IS_PRICING_TEST } from "../constants/config.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const settings = await getShopSettings(request);
-  return { settings };
+
+  const { admin, billing, session } = await authenticate.admin(request);
+  const { hasActivePayment } = await billing.check({
+    plans: [PREMIUM_PLAN],
+    isTest: IS_PRICING_TEST,
+  });
+
+  const response = await admin.graphql(
+    `#graphql
+    query getApp {
+      app {
+        handle
+      }
+    }`
+  );
+  const { data } = await response.json();
+  const handle = data.app.handle;
+  const shopId = session.shop.replace(".myshopify.com", "");
+  const planName = hasActivePayment ? "Premium" : "Free";
+
+  return { settings, planName, shop: shopId, handle };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -58,7 +80,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Settings() {
-  const { settings } = useLoaderData<typeof loader>();
+  const { settings, planName, shop, handle } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const [formValues, setFormValues] = useState(settings);
 
@@ -78,6 +100,12 @@ export default function Settings() {
       : basePrice * (1 + rate / 100); // For revenue: increase by rate%
   };
 
+  const handleManagePricing = () => {
+    window?.top?.location.replace(
+      `https://admin.shopify.com/store/${shop}/charges/${handle}/pricing_plans`
+    );
+  };
+
   return (
     <Page
       title="Settings"
@@ -93,6 +121,27 @@ export default function Settings() {
             <Banner tone="success">Settings updated successfully</Banner>
           </Layout.Section>
         )}
+
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <BlockStack gap="200">
+                <Text as="h2" variant="headingMd">Plan Settings</Text>
+                <Text as="p" variant="bodyMd">
+                  You are currently on the <Text as="span" fontWeight="bold">{planName}</Text> plan.
+                </Text>
+              </BlockStack>
+              <InlineStack align="end">
+                <Button
+                  onClick={handleManagePricing}
+                  accessibilityLabel="Manage Subscription"
+                >
+                  Manage Subscription
+                </Button>
+              </InlineStack>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
 
         <Layout.Section>
           <Card>
