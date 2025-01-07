@@ -16,32 +16,16 @@ import {
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import { getShopSettings, updateShopSettings } from "../models/settings.server";
+import { getShop } from "../models/shop.server";
 import { initializeAll } from "../models/recommendation.server";
-import { authenticate, PREMIUM_PLAN } from "../shopify.server";
-import { IS_PRICING_TEST } from "../constants/config.server";
+import { SHOPIFY_APP_HANDLE } from "../constants/config.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const settings = await getShopSettings(request);
-
-  const { admin, billing, session } = await authenticate.admin(request);
-  const { hasActivePayment } = await billing.check({
-    plans: [PREMIUM_PLAN],
-    isTest: IS_PRICING_TEST,
-  });
-
-  const response = await admin.graphql(
-    `#graphql
-    query getApp {
-      app {
-        handle
-      }
-    }`
-  );
-  const { data } = await response.json();
-  const handle = data.app.handle;
-  const shopId = session.shop.replace(".myshopify.com", "");
-  const planName = hasActivePayment ? "Premium" : "Free";
-  const pricingPlanUrl = `https://admin.shopify.com/store/${shopId}/charges/${handle}/pricing_plans`;
+  const shop = await getShop(request);
+  const shopId = shop.shop.replace(".myshopify.com", "");
+  const planName = shop.subscription === "PREMIUM" ? "Premium" : "Free";
+  const pricingPlanUrl = `https://admin.shopify.com/store/${shopId}/charges/${SHOPIFY_APP_HANDLE}/pricing_plans`;
 
   return { settings, planName, pricingPlanUrl };
 }

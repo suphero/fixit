@@ -26,6 +26,14 @@ model Session {
   emailVerified Boolean?  @default(false)
 }
 
+model Shop {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop          String   @unique
+  subscription  Subscription @default(FREE)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 model Recommendation {
   id                  String   @id @default(auto()) @map("_id") @db.ObjectId
   shop                String
@@ -87,6 +95,11 @@ enum RecommendationSubType {
 enum RecommendationStatus {
   PENDING
   RESOLVED
+}
+
+enum Subscription {
+  FREE
+  PREMIUM
 }
 
 model Settings {

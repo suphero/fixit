@@ -1,14 +1,14 @@
 import { consumeFromQueue, sendToQueue } from "../mq.server";
 import { unauthenticated } from "../shopify.server";
-import { updateScope } from "../models/session.business.server";
+import { updateSubscription } from "../models/shop.business.server";
 
-const QUEUE = "scopes_update";
+const QUEUE = "subscription_update";
 
 export const publish = (
   shop: string,
-  scopes: string[],
+  subscriptionName: string,
 ) => {
-  return sendToQueue(QUEUE, JSON.stringify({ shop, scopes }));
+  return sendToQueue(QUEUE, JSON.stringify({ shop, subscriptionName }));
 };
 
 export const consume = () =>
@@ -21,13 +21,15 @@ export const consume = () =>
       if (!content.shop) {
         throw new Error("Invalid message: 'shop' field is required.");
       }
-      if (!content.scopes) {
-        throw new Error("Invalid message: 'scopes' field is required.");
+      if (!content.subscriptionName) {
+        throw new Error(
+          "Invalid message: 'subscriptionName' field is required.",
+        );
       }
 
       const { session } = await unauthenticated.admin(content.shop);
-      updateScope(session.id, content.scopes);
+      updateSubscription(session.id, content.subscriptionName);
     } catch (error) {
-      console.error("Error updating scopes:", error);
+      console.error("Error updating subscription:", error);
     }
   });

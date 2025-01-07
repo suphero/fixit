@@ -1,4 +1,5 @@
 import { consumeFromQueue, sendToQueue } from "../mq.server";
+import { deleteShop } from "../models/shop.business.server";
 import { deleteRecommendations } from "../models/recommendation.business.server";
 import { deleteSettings } from "../models/settings.business.server";
 import { deleteSession } from "../models/session.business.server";
@@ -22,6 +23,7 @@ export const consume = () =>
 
       console.log(`Starting deletion process for shop: ${shop}`);
 
+      await deleteShop(shop);
       await deleteRecommendations(shop);
       await deleteSettings(shop);
       await deleteSession(shop);

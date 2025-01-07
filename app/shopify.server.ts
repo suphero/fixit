@@ -2,15 +2,13 @@ import "@shopify/shopify-app-remix/adapters/node";
 import {
   ApiVersion,
   AppDistribution,
-  BillingInterval,
   shopifyApp,
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+import { createShop } from "./models/shop.business.server";
 import { createSettings } from "./models/settings.business.server";
 import { publish } from "./consumers/generate-reco.server";
-
-export const PREMIUM_PLAN: string = "Premium";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -21,6 +19,7 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   hooks: {
     afterAuth: async ({ session }) => {
+      await createShop(session.shop);
       await createSettings(session.shop);
       await publish(session.shop);
     },
@@ -30,26 +29,6 @@ const shopify = shopifyApp({
   future: {
     unstable_newEmbeddedAuthStrategy: true,
     removeRest: true,
-  },
-  billing: {
-    [PREMIUM_PLAN]: {
-      lineItems: [
-        {
-          amount: 10,
-          currencyCode: "USD",
-          interval: BillingInterval.Every30Days,
-        },
-      ],
-    },
-    [PREMIUM_PLAN]: {
-      lineItems: [
-        {
-          amount: 90,
-          currencyCode: "USD",
-          interval: BillingInterval.Annual,
-        },
-      ],
-    },
   },
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
