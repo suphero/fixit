@@ -1,3 +1,4 @@
+import type { Subscription } from "@prisma/client";
 import { consumeFromQueue, sendToQueue } from "../mq.server";
 import { unauthenticated } from "../shopify.server";
 import { updateSubscription } from "../models/shop.business.server";
@@ -7,8 +8,12 @@ const QUEUE = "subscription_update";
 export const publish = (
   shop: string,
   subscriptionName: string,
+  subscriptionStatus: string,
 ) => {
-  return sendToQueue(QUEUE, JSON.stringify({ shop, subscriptionName }));
+  return sendToQueue(
+    QUEUE,
+    JSON.stringify({ shop, subscriptionName, subscriptionStatus }),
+  );
 };
 
 export const consume = () =>
@@ -26,9 +31,24 @@ export const consume = () =>
           "Invalid message: 'subscriptionName' field is required.",
         );
       }
+      if (!content.subscriptionStatus) {
+        throw new Error(
+          "Invalid message: 'subscriptionStatus' field is required.",
+        );
+      }
+
+      let subscription: Subscription;
+      if (
+        content.subscriptionName === "Premium" &&
+        content.subscriptionStatus === "ACTIVE"
+      ) {
+        subscription = "PREMIUM";
+      } else {
+        subscription = "FREE";
+      }
 
       const { session } = await unauthenticated.admin(content.shop);
-      updateSubscription(session.id, content.subscriptionName);
+      updateSubscription(session.id, subscription);
     } catch (error) {
       console.error("Error updating subscription:", error);
     }

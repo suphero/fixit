@@ -1,5 +1,4 @@
-import type { Shop } from "@prisma/client";
-import { Subscription } from "@prisma/client";
+import type { Shop, Subscription } from "@prisma/client";
 import db from "../db.server";
 
 export async function deleteShop(shop: string) {
@@ -17,21 +16,7 @@ export async function createShop(shop: string): Promise<Shop> {
   });
 }
 
-export function updateSubscription(
-  shop: string,
-  subscriptionName: "Free" | "Premium",
-) {
-  let subscription;
-  switch (subscriptionName) {
-    case "Free":
-      subscription = Subscription.FREE;
-      break;
-    case "Premium":
-      subscription = Subscription.PREMIUM;
-      break;
-    default:
-      throw new Error(`Invalid subscription: ${subscriptionName}`);
-  }
+export function updateSubscription(shop: string, subscription: Subscription) {
   return db.shop.update({
     where: { shop },
     data: { subscription },
