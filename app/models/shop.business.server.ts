@@ -1,4 +1,5 @@
-import type { Shop, Subscription } from "@prisma/client";
+import type { Shop } from "@prisma/client";
+import { Subscription } from "@prisma/client";
 import db from "../db.server";
 
 export async function deleteShop(shop: string) {
@@ -16,11 +17,27 @@ export async function createShop(shop: string): Promise<Shop> {
   });
 }
 
-export function updateSubscription(shop: string, subscription: Subscription) {
-  return db.shop.update({
-    where: { shop },
-    data: { subscription },
-  });
+export async function updateSubscription(shop: string, subscriptionId: string, subscriptionName: Subscription, subscriptionStatus: string) {
+  if (subscriptionStatus === "ACTIVE") {
+    return db.shop.update({
+      where: { shop },
+      data: {
+        subscriptionId,
+        subscriptionName,
+      },
+    });
+  }
+  const shopData = await getShop(shop);
+  // Not active, so we need to remove the subscription
+  if (shopData.subscriptionId === subscriptionId && subscriptionStatus !== "ACTIVE") {
+    return db.shop.update({
+      where: { shop },
+      data: {
+        subscriptionId: null,
+        subscriptionName: Subscription.Free,
+      },
+    });
+  }
 }
 
 export async function getShop(shop: string): Promise<Shop> {

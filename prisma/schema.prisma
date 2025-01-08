@@ -27,11 +27,12 @@ model Session {
 }
 
 model Shop {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  shop          String   @unique
-  subscription  Subscription @default(FREE)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop              String   @unique
+  subscriptionId    String?
+  subscriptionName  Subscription @default(Free)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Recommendation {
@@ -97,9 +98,10 @@ enum RecommendationStatus {
   RESOLVED
 }
 
+// Sync with the Subscription enum in the Shopify app
 enum Subscription {
-  FREE
-  PREMIUM
+  Free
+  Premium
 }
 
 model Settings {
