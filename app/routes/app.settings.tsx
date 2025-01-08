@@ -16,11 +16,18 @@ import {
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import { getShopSettings, updateShopSettings } from "../models/settings.server";
+import { getShop } from "../models/shop.server";
 import { initializeAll } from "../models/recommendation.server";
+import { SHOPIFY_APP_HANDLE } from "../constants/config.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const settings = await getShopSettings(request);
-  return { settings };
+  const shop = await getShop(request);
+  const shopId = shop.shop.replace(".myshopify.com", "");
+  const planName = shop.subscriptionName;
+  const pricingPlanUrl = `https://admin.shopify.com/store/${shopId}/charges/${SHOPIFY_APP_HANDLE}/pricing_plans`;
+
+  return { settings, planName, pricingPlanUrl };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -58,7 +65,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Settings() {
-  const { settings } = useLoaderData<typeof loader>();
+  const { settings, planName, pricingPlanUrl } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const [formValues, setFormValues] = useState(settings);
 
@@ -78,6 +85,10 @@ export default function Settings() {
       : basePrice * (1 + rate / 100); // For revenue: increase by rate%
   };
 
+  const handleManagePricing = () => {
+    window?.top?.location.replace(pricingPlanUrl);
+  };
+
   return (
     <Page
       title="Settings"
@@ -93,6 +104,27 @@ export default function Settings() {
             <Banner tone="success">Settings updated successfully</Banner>
           </Layout.Section>
         )}
+
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <BlockStack gap="200">
+                <Text as="h2" variant="headingMd">Plan Settings</Text>
+                <Text as="p" variant="bodyMd">
+                  You are currently on the <Text as="span" fontWeight="bold">{planName}</Text> plan.
+                </Text>
+              </BlockStack>
+              <InlineStack align="end">
+                <Button
+                  onClick={handleManagePricing}
+                  accessibilityLabel="Manage Subscription"
+                >
+                  Manage Subscription
+                </Button>
+              </InlineStack>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
 
         <Layout.Section>
           <Card>

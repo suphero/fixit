@@ -28,6 +28,6 @@ export const consume = () =>
       const { session } = await unauthenticated.admin(content.shop);
       updateScope(session.id, content.scopes);
     } catch (error) {
-      console.error("Error generating recommendations:", error);
+      console.error("Error updating scopes:", error);
     }
   });

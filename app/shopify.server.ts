@@ -6,8 +6,9 @@ import {
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+import { createShop } from "./models/shop.business.server";
 import { createSettings } from "./models/settings.business.server";
-import { publish } from "./queues/generate-reco.server";
+import { publish } from "./consumers/generate-reco.server";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -18,6 +19,7 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   hooks: {
     afterAuth: async ({ session }) => {
+      await createShop(session.shop);
       await createSettings(session.shop);
       await publish(session.shop);
     },

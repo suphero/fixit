@@ -1,19 +1,21 @@
 import amqp from "amqplib";
-import * as deleteShopConsumer from "./queues/delete-shop.server";
-import * as generateRecoConsumer from "./queues/generate-reco.server";
-import * as scopesUpdateConsumer from "./queues/scopes-update.server";
+import * as deleteShopConsumer from "./consumers/delete-shop.server";
+import * as generateRecoConsumer from "./consumers/generate-reco.server";
+import * as scopesUpdateConsumer from "./consumers/scopes-update.server";
+import * as subscriptionUpdateConsumer from "./consumers/subscription-update.server";
 
 declare global {
   var rabbitmqConnection: amqp.Connection | undefined;
 }
 
-type RABBITMQ_QUEUE = "delete_shop" | "generate_reco" | "scopes_update";
+type RABBITMQ_QUEUE = "delete_shop" | "generate_reco" | "scopes_update" | "subscription_update";
 
 let connection: amqp.Connection;
 const channels: Record<RABBITMQ_QUEUE, amqp.Channel> = {
   delete_shop: null as unknown as amqp.Channel,
   generate_reco: null as unknown as amqp.Channel,
   scopes_update: null as unknown as amqp.Channel,
+  subscription_update: null as unknown as amqp.Channel,
 };
 
 export async function getRabbitMQConnection(): Promise<amqp.Connection> {
@@ -79,6 +81,7 @@ async function startQueueConsumers() {
     await deleteShopConsumer.consume();
     await generateRecoConsumer.consume();
     await scopesUpdateConsumer.consume();
+    await subscriptionUpdateConsumer.consume();
     console.log('Queue consumers started successfully');
   } catch (error) {
     console.error('Error starting queue consumers:', error);

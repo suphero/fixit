@@ -1,5 +1,4 @@
 import type { Settings } from "@prisma/client";
-import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 import db from "../db.server";
 import { updateRecommendationsForSettings } from "./recommendation.business.server";
 
@@ -48,7 +47,6 @@ export async function createSettings(shop: string): Promise<Settings> {
 }
 
 export async function updateShopSettings(
-  graphql: AdminGraphqlClient,
   shop: string,
   updates: Partial<Settings>
 ): Promise<Settings> {

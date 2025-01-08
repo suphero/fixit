@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import { publish } from "../queues/scopes-update.server";
+import { publish } from "../consumers/scopes-update.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { payload, shop } = await authenticate.webhook(request);
