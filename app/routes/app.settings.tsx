@@ -24,7 +24,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const settings = await getShopSettings(request);
   const shop = await getShop(request);
   const shopId = shop.shop.replace(".myshopify.com", "");
-  const planName = shop.subscription === "PREMIUM" ? "Premium" : "Free";
+  const planName = shop.subscriptionName;
   const pricingPlanUrl = `https://admin.shopify.com/store/${shopId}/charges/${SHOPIFY_APP_HANDLE}/pricing_plans`;
 
   return { settings, planName, pricingPlanUrl };
