@@ -31,7 +31,7 @@ export const consume = () =>
 
       const { session } = await unauthenticated.admin(content.shop);
       updateSubscription(
-        session.id,
+        session.shop,
         content.subscriptionId,
         content.subscriptionName,
         content.subscriptionStatus,

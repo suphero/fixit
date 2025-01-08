@@ -18,6 +18,7 @@ export async function createShop(shop: string): Promise<Shop> {
 }
 
 export async function updateSubscription(shop: string, subscriptionId: string, subscriptionName: Subscription, subscriptionStatus: string) {
+  const shopData = await getShop(shop);
   if (subscriptionStatus === "ACTIVE") {
     return db.shop.update({
       where: { shop },
@@ -27,7 +28,6 @@ export async function updateSubscription(shop: string, subscriptionId: string, s
       },
     });
   }
-  const shopData = await getShop(shop);
   // Not active, so we need to remove the subscription
   if (shopData.subscriptionId === subscriptionId && subscriptionStatus !== "ACTIVE") {
     return db.shop.update({
@@ -38,6 +38,7 @@ export async function updateSubscription(shop: string, subscriptionId: string, s
       },
     });
   }
+  console.error(`Unexpected updateSubscription call for shop: ${shop}, subscriptionId: ${subscriptionId}, subscriptionStatus: ${subscriptionStatus}`);
 }
 
 export async function getShop(shop: string): Promise<Shop> {
