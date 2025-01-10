@@ -97,9 +97,8 @@ export async function updateImage(
   graphql: AdminGraphqlClient,
   id: string,
   image: File
-): Promise<void> {
-  // First, get a staged upload URL
-  const stagedUploadResponse = await graphql(
+) {
+  const stagedUploadsResponse = await graphql(
     `#graphql
     mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
       stagedUploadsCreate(input: $input) {
@@ -111,43 +110,6 @@ export async function updateImage(
             value
           }
         }
-      }
-    }`,
-    {
-      variables: {
-        input: [{
-          filename: image.name,
-          mimeType: image.type,
-          resource: "PRODUCT_IMAGE"
-        }]
-      }
-    }
-  );
-
-  const { data } = await stagedUploadResponse.json();
-  const [{ url, parameters }] = data.stagedUploadsCreate.stagedTargets;
-
-  // Create form data for upload
-  const formData = new FormData();
-  parameters.forEach(({ name, value }: { name: string; value: string }) => {
-    formData.append(name, value);
-  });
-  formData.append('file', image);
-
-  // Upload the file
-  await fetch(url, {
-    method: 'POST',
-    body: formData,
-  });
-
-  // Attach the image to the product
-  await graphql(
-    `#graphql
-    mutation productUpdate($input: ProductUpdateInput!) {
-      productUpdate(product: $input) {
-        product {
-          id
-        }
         userErrors {
           field
           message
@@ -156,13 +118,72 @@ export async function updateImage(
     }`,
     {
       variables: {
-        input: {
-          id,
-          images: [{
-            src: parameters.find((p: any) => p.name === 'key')?.value
-          }]
-        }
+        input: [{
+          filename: image.name,
+          mimeType: image.type,
+          httpMethod: "POST",
+          resource: "PRODUCT_IMAGE"
+        }]
       }
     }
   );
+
+  const { data } = await stagedUploadsResponse.json();
+  const [{ url, parameters }] = data.stagedUploadsCreate.stagedTargets;
+
+  const formData = new FormData();
+  parameters.forEach(({ name, value }: { name: string; value: string }) => {
+    formData.append(name, value);
+  });
+  formData.append('file', image);
+
+  const uploadResponse = await fetch(url, {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error(`Image upload failed with status: ${uploadResponse.status}`);
+  }
+
+  const responseText = await uploadResponse.text();
+  const locationRegex = /<Location>(.*?)<\/Location>/;
+  const locationMatch = locationRegex.exec(responseText);
+  const imageUrl = locationMatch ? locationMatch[1] : null;
+
+  if (!imageUrl) {
+    throw new Error('Failed to get image URL from upload response');
+  }
+
+  const updateProductResponse = await graphql(
+    `#graphql
+      mutation UpdateProductWithNewMedia(
+        $product: ProductUpdateInput!
+        $media: [CreateMediaInput!]
+      ) {
+        productUpdate(product: $product, media: $media) {
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `,
+    {
+      variables: {
+        product: {
+          id,
+        },
+        media: [
+          {
+            originalSource: imageUrl,
+            mediaContentType: "IMAGE",
+          }
+        ],
+      },
+    },
+  );
+
+  const updateProductData = await updateProductResponse.json();
+  return updateProductData;
 }
