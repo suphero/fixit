@@ -28,6 +28,7 @@ import { getShopifyAdminUrl } from "../utils/url";
 import { UpdateTextModal } from "./app.reco.update-text";
 import { UpdateMediaModal } from "./app.reco.update-media";
 import { UpdatePricingModal } from "./app.reco.update-pricing";
+import { UpdateStockModal } from "./app.reco.update-stock";
 
 type LoaderData = {
   shop: string;
@@ -119,6 +120,7 @@ export default function Index() {
   const [selectedPricingRecommendation, setSelectedPricingRecommendation] = useState<Recommendation | null>(null);
   const [selectedTextRecommendation, setSelectedTextRecommendation] = useState<Recommendation | null>(null);
   const [selectedMediaRecommendation, setSelectedMediaRecommendation] = useState<Recommendation | null>(null);
+  const [selectedStockRecommendation, setSelectedStockRecommendation] = useState<Recommendation | null>(null);
 
   const tabs = Object.entries(TAB_DEFINITIONS)
     .map(([type, definition]) => ({
@@ -200,6 +202,11 @@ export default function Index() {
           {recommendation.type === "MEDIA" && (
             <Button onClick={() => setSelectedMediaRecommendation(recommendation)} variant="primary">Fix</Button>
           )}
+          {recommendation.type === "STOCK" && (
+            <Button onClick={() => setSelectedStockRecommendation(recommendation)} variant="primary">
+              Fix
+            </Button>
+          )}
         </ButtonGroup>
       </IndexTable.Cell>
     </IndexTable.Row>
@@ -244,6 +251,10 @@ export default function Index() {
         settings={data.settings}
         shopData={data.shopData}
         onClose={() => setSelectedPricingRecommendation(null)}
+      />
+      <UpdateStockModal
+        recommendation={selectedStockRecommendation}
+        onClose={() => setSelectedStockRecommendation(null)}
       />
       <IndexTable
         resourceName={{ singular: "Recommendation", plural: "Recommendations" }}

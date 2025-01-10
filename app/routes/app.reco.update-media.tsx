@@ -15,7 +15,10 @@ export async function action({ request }: ActionFunctionArgs) {
   const recommendationId = formData.get('recommendationId') as string;
   const image = formData.get('image') as File;
 
-  await updateMedia(request, recommendationId, image);
+  await updateMedia(request, {
+    id: recommendationId,
+    file: image,
+  });
   return { success: true };
 }
 

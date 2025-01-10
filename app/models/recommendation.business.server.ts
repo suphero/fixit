@@ -20,7 +20,9 @@ type ProductVariantNode = {
   title: string;
   price: string;
   compareAtPrice: string | null;
+  inventoryQuantity: number;
   inventoryItem: {
+    tracked: boolean;
     unitCost: { amount: string } | null;
   };
   product: {
@@ -179,7 +181,7 @@ function getStockCriteria(
   let criterias = Object.entries({
     NO_STOCK: {
       type: RecommendationType.STOCK,
-      filter: (node: ProductNode) => node.totalInventory === 0,
+      filter: (node: ProductVariantNode) => node.inventoryQuantity === 0 && node.inventoryItem.tracked,
     },
   });
 
@@ -285,26 +287,6 @@ async function getProductRecommendations(
           });
         }
       }
-
-      if (stockCriterias.length > 0) {
-        const stockIssues = stockCriterias
-          .filter(([, criteria]) => criteria.filter(node))
-          .map(([subType]) => subType as RecommendationSubType);
-
-        if (stockIssues.length > 0) {
-          recommendations.push({
-            shop,
-            targetType: TargetType.PRODUCT,
-            productId: node.id,
-            variantId: null,
-            targetTitle: node.title,
-            targetUrl: getProductUrlFromGid(node.id),
-            type: RecommendationType.STOCK,
-            subTypes: stockIssues,
-            status: RecommendationStatus.PENDING,
-          });
-        }
-      }
     }
 
     hasNextPage = pageInfo.hasNextPage;
@@ -323,11 +305,21 @@ async function getProductVariantRecommendations(
     recommendationSubTypes?: RecommendationSubType[];
   } = {},
 ) {
-  const criterias = getPricingCriteria(
+  const pricingCriterias = getPricingCriteria(
     settings,
     params?.recommendationSubTypes,
   );
-  if (criterias.length === 0) return [];
+
+  const stockCriterias = getStockCriteria(
+    settings,
+    params?.recommendationSubTypes,
+  );
+  if (
+    pricingCriterias.length === 0 &&
+    stockCriterias.length === 0
+  )
+    return [];
+
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
   let cursor = null;
@@ -339,32 +331,57 @@ async function getProductVariantRecommendations(
     });
 
     for (const { node } of edges) {
-      // Check pricing issues
-      const pricingIssues = criterias
-        .filter(([, criteria]) => criteria.filter(node))
-        .map(([subType]) => subType as RecommendationSubType);
+      const isVariantDefault = node.product.hasOnlyDefaultVariant;
+      const targetType = isVariantDefault
+        ? TargetType.PRODUCT
+        : TargetType.PRODUCT_VARIANT;
+      const targetTitle = isVariantDefault
+        ? node.product.title
+        : `${node.product.title} - ${node.title}`;
+      const targetUrl = getProductVariantUrlFromGid(
+        node.product.id,
+        node.id,
+        isVariantDefault,
+      );
 
-      if (pricingIssues.length > 0) {
-        const isVariantDefault = node.product.hasOnlyDefaultVariant;
-        recommendations.push({
-          shop,
-          targetType: isVariantDefault
-            ? TargetType.PRODUCT
-            : TargetType.PRODUCT_VARIANT,
-          productId: node.product.id,
-          variantId: node.id,
-          targetTitle: isVariantDefault
-            ? node.product.title
-            : `${node.product.title} - ${node.title}`,
-          targetUrl: getProductVariantUrlFromGid(
-            node.product.id,
-            node.id,
-            isVariantDefault,
-          ),
-          type: RecommendationType.PRICING,
-          subTypes: pricingIssues,
-          status: RecommendationStatus.PENDING,
-        });
+      if (pricingCriterias.length > 0) {
+        const pricingIssues = pricingCriterias
+          .filter(([, criteria]) => criteria.filter(node))
+          .map(([subType]) => subType as RecommendationSubType);
+
+        if (pricingIssues.length > 0) {
+          recommendations.push({
+            shop,
+            targetType,
+            productId: node.product.id,
+            variantId: node.id,
+            targetTitle,
+            targetUrl,
+            type: RecommendationType.PRICING,
+            subTypes: pricingIssues,
+            status: RecommendationStatus.PENDING,
+          });
+        }
+      }
+
+      if (stockCriterias.length > 0) {
+        const stockIssues = stockCriterias
+          .filter(([, criteria]) => criteria.filter(node))
+          .map(([subType]) => subType as RecommendationSubType);
+
+        if (stockIssues.length > 0) {
+          recommendations.push({
+            shop,
+            targetType,
+            productId: node.product.id,
+            variantId: node.id,
+            targetTitle,
+            targetUrl,
+            type: RecommendationType.STOCK,
+            subTypes: stockIssues,
+            status: RecommendationStatus.PENDING,
+          });
+        }
       }
     }
 
@@ -541,17 +558,23 @@ export async function updateText(
 export async function updateMedia(
   graphql: AdminGraphqlClient,
   shop: string,
-  id: string,
-  image: File,
+  data: {
+    id: string,
+    image: File,
+  },
 ) {
-  const recommendation = await findRecommendation(shop, id);
+  const recommendation = await findRecommendation(shop, data.id);
   if (!recommendation) throw new Error("Recommendation not found");
   if (!recommendation.productId) throw new Error("Product not found");
 
   // Upload and attach the image
-  await productBusiness.updateImage(graphql, recommendation.productId, image);
+  await productBusiness.updateImage(
+    graphql,
+    recommendation.productId,
+    data.image,
+  );
 
-  return updateRecommendationStatus(id, "RESOLVED");
+  return updateRecommendationStatus(data.id, "RESOLVED");
 }
 
 export function deleteRecommendations(shop: string) {
@@ -611,4 +634,27 @@ export function updateRecommendationsForSettings(
   }
 
   return publish(shop, { recommendationSubTypes });
+}
+
+export async function updateStock(
+  graphql: AdminGraphqlClient,
+  shop: string,
+  data: {
+    id: string;
+    quantity: number;
+  },
+) {
+  const recommendation = await findRecommendation(shop, data.id);
+  if (!recommendation) throw new Error("Recommendation not found");
+  if (!recommendation.productId) throw new Error("Product not found");
+  if (!recommendation.variantId) throw new Error("Variant not found");
+
+  // Update inventory level
+  await variantBusiness.updateInventory(
+    graphql,
+    recommendation.variantId,
+    data.quantity
+  );
+
+  return updateRecommendationStatus(data.id, "RESOLVED");
 }

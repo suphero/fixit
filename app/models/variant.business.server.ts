@@ -49,7 +49,9 @@ export async function fetchVariant(
             title
             price
             compareAtPrice
+            inventoryQuantity
             inventoryItem {
+              tracked
               unitCost {
                 amount
               }
@@ -134,4 +136,82 @@ export async function isVariantDefault(graphql: AdminGraphqlClient, variantId: s
 
   const { data } = await response.json();
   return data.productVariant.product.hasOnlyDefaultVariant;
+}
+
+export async function updateInventory(
+  graphql: AdminGraphqlClient,
+  variantId: string,
+  quantity: number
+) {
+  // First, get the inventory item ID and available locations
+  const response = await graphql(
+    `#graphql
+    query getVariantInventory($id: ID!) {
+      productVariant(id: $id) {
+        inventoryItem {
+          id
+          tracked
+          inventoryLevels(first: 1) {
+            edges {
+              node {
+                location {
+                  id
+                }
+              }
+            }
+          }
+        }
+      }
+    }`,
+    {
+      variables: { id: variantId }
+    }
+  );
+
+  const { data } = await response.json();
+  const inventoryItemId = data.productVariant.inventoryItem.id;
+  const locationId =
+    data.productVariant.inventoryItem.inventoryLevels.edges[0]?.node.location
+      .id;
+
+  if (!locationId) {
+    throw new Error('No location found for this variant');
+  }
+
+  // Then adjust the quantity
+  const adjustResponse = await graphql(
+    `#graphql
+    mutation inventoryAdjustQuantities($input: InventoryAdjustQuantitiesInput!) {
+      inventoryAdjustQuantities(input: $input) {
+        userErrors {
+          field
+          message
+        }
+        inventoryAdjustmentGroup {
+          createdAt
+          changes {
+            name
+            delta
+          }
+        }
+      }
+    }`,
+    {
+      variables: {
+        input: {
+          reason: "correction",
+          name: "available",
+          changes: [
+            {
+              delta: quantity,
+              inventoryItemId,
+              locationId
+            }
+          ]
+        }
+      }
+    }
+  );
+
+  return adjustResponse.json();
 }
