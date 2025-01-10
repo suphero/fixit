@@ -85,8 +85,8 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
       },
     ],
   },
-  DEFINITION: {
-    content: "Content",
+  TEXT: {
+    content: "Text",
     subTypes: [
       {
         type: "SHORT_TITLE",
@@ -112,6 +112,11 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
         tone: "info-strong",
         icon: TextInRowsIcon,
       },
+    ],
+  },
+  MEDIA: {
+    content: "Media",
+    subTypes: [
       {
         type: "NO_IMAGE",
         label: "No Image",

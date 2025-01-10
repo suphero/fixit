@@ -64,7 +64,8 @@ enum TargetType {
 
 enum RecommendationType {
   PRICING
-  DEFINITION
+  TEXT
+  MEDIA
   STOCK
 }
 

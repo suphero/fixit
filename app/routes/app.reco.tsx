@@ -194,17 +194,11 @@ export default function Index() {
           {recommendation.type === "PRICING" && (
             <Button onClick={() => setSelectedPricingRecommendation(recommendation)} variant="primary">Fix</Button>
           )}
-          {recommendation.type === "DEFINITION" && (
-            <ButtonGroup>
-              {recommendation.subTypes.some(st =>
-                ['SHORT_TITLE', 'LONG_TITLE', 'SHORT_DESCRIPTION', 'LONG_DESCRIPTION'].includes(st)
-              ) && (
-                <Button onClick={() => setSelectedTextRecommendation(recommendation)} variant="primary">Fix Text</Button>
-              )}
-              {recommendation.subTypes.includes('NO_IMAGE') && (
-                <Button onClick={() => setSelectedMediaRecommendation(recommendation)} variant="primary">Fix Media</Button>
-              )}
-            </ButtonGroup>
+          {recommendation.type === "TEXT" && (
+            <Button onClick={() => setSelectedTextRecommendation(recommendation)} variant="primary">Fix</Button>
+          )}
+          {recommendation.type === "MEDIA" && (
+            <Button onClick={() => setSelectedMediaRecommendation(recommendation)} variant="primary">Fix</Button>
           )}
         </ButtonGroup>
       </IndexTable.Cell>

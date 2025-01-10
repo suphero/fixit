@@ -121,14 +121,11 @@ function getPricingCriteria(
   return criterias;
 }
 
-function getDefinitionCriteria(
+function getTextCriteria(
   settings: Settings,
   recommendationSubTypes?: RecommendationSubType[],
 ) {
   let criterias = Object.entries({
-    NO_IMAGE: {
-      filter: (node: ProductNode) => node.featuredMedia === null,
-    },
     SHORT_TITLE: {
       filter: (node: ProductNode) =>
         node.title.length < settings.shortTitleLength,
@@ -144,6 +141,25 @@ function getDefinitionCriteria(
     LONG_DESCRIPTION: {
       filter: (node: ProductNode) =>
         node.description.length > settings.longDescriptionLength,
+    },
+  });
+
+  if (recommendationSubTypes) {
+    criterias = criterias.filter(([subType]) =>
+      recommendationSubTypes.includes(subType as RecommendationSubType),
+    );
+  }
+
+  return criterias;
+}
+
+function getMediaCriteria(
+  _settings: Settings,
+  recommendationSubTypes?: RecommendationSubType[],
+) {
+  let criterias = Object.entries({
+    NO_IMAGE: {
+      filter: (node: ProductNode) => node.featuredMedia === null,
     },
   });
 
@@ -205,7 +221,11 @@ async function getProductRecommendations(
     recommendationSubTypes?: RecommendationSubType[];
   } = {},
 ) {
-  const definitionCriterias = getDefinitionCriteria(
+  const textCriterias = getTextCriteria(
+    settings,
+    params?.recommendationSubTypes,
+  );
+  const mediaCriterias = getMediaCriteria(
     settings,
     params?.recommendationSubTypes,
   );
@@ -213,8 +233,7 @@ async function getProductRecommendations(
     settings,
     params?.recommendationSubTypes,
   );
-  if (definitionCriterias.length === 0 && stockCriterias.length === 0)
-    return [];
+  if (textCriterias.length === 0 && mediaCriterias.length === 0 && stockCriterias.length === 0) return [];
 
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
@@ -227,13 +246,12 @@ async function getProductRecommendations(
     });
 
     for (const { node } of edges) {
-      // Check definition issues
-      if (definitionCriterias.length > 0) {
-        const definitionIssues = definitionCriterias
+      if (textCriterias.length > 0) {
+        const textIssues = textCriterias
           .filter(([, criteria]) => criteria.filter(node))
           .map(([subType]) => subType as RecommendationSubType);
 
-        if (definitionIssues.length > 0) {
+        if (textIssues.length > 0) {
           recommendations.push({
             shop,
             targetType: TargetType.PRODUCT,
@@ -241,14 +259,33 @@ async function getProductRecommendations(
             variantId: null,
             targetTitle: node.title,
             targetUrl: getProductUrlFromGid(node.id),
-            type: RecommendationType.DEFINITION,
-            subTypes: definitionIssues,
+            type: RecommendationType.TEXT,
+            subTypes: textIssues,
             status: RecommendationStatus.PENDING,
           });
         }
       }
 
-      // Check stock issues
+      if (mediaCriterias.length > 0) {
+        const mediaIssues = mediaCriterias
+          .filter(([, criteria]) => criteria.filter(node))
+          .map(([subType]) => subType as RecommendationSubType);
+
+        if (mediaIssues.length > 0) {
+          recommendations.push({
+            shop,
+            targetType: TargetType.PRODUCT,
+            productId: node.id,
+            variantId: null,
+            targetTitle: node.title,
+            targetUrl: getProductUrlFromGid(node.id),
+            type: RecommendationType.MEDIA,
+            subTypes: mediaIssues,
+            status: RecommendationStatus.PENDING,
+          });
+        }
+      }
+
       if (stockCriterias.length > 0) {
         const stockIssues = stockCriterias
           .filter(([, criteria]) => criteria.filter(node))
@@ -591,7 +628,7 @@ export function updateRecommendationsForSettings(
     if (changes.pricing.highDiscountRate) recommendationSubTypes.push("HIGH_DISCOUNT");
   }
 
-  // Content changes
+  // Text changes
   if (Object.values(changes.content).some(Boolean)) {
     if (changes.content.shortTitle) recommendationSubTypes.push("SHORT_TITLE");
     if (changes.content.longTitle) recommendationSubTypes.push("LONG_TITLE");
