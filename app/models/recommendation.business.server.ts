@@ -565,7 +565,7 @@ interface SettingsChanges {
     lowDiscountRate: boolean;
     highDiscountRate: boolean;
   };
-  content: {
+  text: {
     shortTitle: boolean;
     longTitle: boolean;
     shortDescription: boolean;
@@ -594,11 +594,13 @@ export function updateRecommendationsForSettings(
   }
 
   // Text changes
-  if (Object.values(changes.content).some(Boolean)) {
-    if (changes.content.shortTitle) recommendationSubTypes.push("SHORT_TITLE");
-    if (changes.content.longTitle) recommendationSubTypes.push("LONG_TITLE");
-    if (changes.content.shortDescription) recommendationSubTypes.push("SHORT_DESCRIPTION");
-    if (changes.content.longDescription) recommendationSubTypes.push("LONG_DESCRIPTION");
+  if (Object.values(changes.text).some(Boolean)) {
+    if (changes.text.shortTitle) recommendationSubTypes.push("SHORT_TITLE");
+    if (changes.text.longTitle) recommendationSubTypes.push("LONG_TITLE");
+    if (changes.text.shortDescription)
+      recommendationSubTypes.push("SHORT_DESCRIPTION");
+    if (changes.text.longDescription)
+      recommendationSubTypes.push("LONG_DESCRIPTION");
   }
 
   // Inventory changes

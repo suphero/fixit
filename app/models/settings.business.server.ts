@@ -59,7 +59,7 @@ export async function updateShopSettings(
   // Check which specific settings have changed
   const changes = {
     pricing: isPricingChanged(currentSettings, newSettings),
-    content: isContentChanged(currentSettings, newSettings),
+    text: isTextChanged(currentSettings, newSettings),
     inventory: isInventoryChanged(currentSettings, newSettings),
   };
 
@@ -80,7 +80,7 @@ function isPricingChanged(old: Settings, new_: Settings) {
   };
 }
 
-function isContentChanged(old: Settings, new_: Settings) {
+function isTextChanged(old: Settings, new_: Settings) {
   return {
     shortTitle: old.shortTitleLength !== new_.shortTitleLength,
     longTitle: old.longTitleLength !== new_.longTitleLength,

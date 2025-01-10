@@ -110,15 +110,15 @@ model Settings {
   shop                    String   @unique
   understockDays          Int      @default(7)
   overstockDays           Int      @default(60)
-  minRevenueRate          Float    @default(0.1)
-  maxRevenueRate          Float    @default(0.9)
+  minRevenueRate          Float    @default(10)
+  maxRevenueRate          Float    @default(90)
   passiveDays             Int      @default(180)
   shortTitleLength        Int      @default(20)
   longTitleLength         Int      @default(70)
   shortDescriptionLength  Int      @default(80)
   longDescriptionLength   Int      @default(400)
-  lowDiscountRate         Float    @default(0.05)
-  highDiscountRate        Float    @default(0.7)
+  lowDiscountRate         Float    @default(5)
+  highDiscountRate        Float    @default(70)
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 }
