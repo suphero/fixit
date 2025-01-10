@@ -533,30 +533,9 @@ export async function updateText(
     descriptionHtml: data.descriptionHtml,
   });
 
-  // Update recommendation status only for resolved text issues
-  const remainingSubTypes = recommendation.subTypes.filter(
-    (subType) =>
-      ![
-        "SHORT_TITLE",
-        "LONG_TITLE",
-        "SHORT_DESCRIPTION",
-        "LONG_DESCRIPTION",
-      ].includes(subType),
-  );
-
-  if (remainingSubTypes.length === 0) {
-    return updateRecommendationStatus(data.id, "RESOLVED", {
-      targetTitle: data.title,
-    });
-  } else {
-    return db.recommendation.update({
-      where: { id: data.id },
-      data: {
-        subTypes: remainingSubTypes,
-        targetTitle: data.title,
-      },
-    });
-  }
+  return updateRecommendationStatus(data.id, "RESOLVED", {
+    targetTitle: data.title,
+  });
 }
 
 export async function updateMedia(
@@ -572,21 +551,7 @@ export async function updateMedia(
   // Upload and attach the image
   await productBusiness.updateImage(graphql, recommendation.productId, image);
 
-  // Update recommendation status only for resolved media issues
-  const remainingSubTypes = recommendation.subTypes.filter(
-    (subType) => subType !== "NO_IMAGE",
-  );
-
-  if (remainingSubTypes.length === 0) {
-    return updateRecommendationStatus(id, "RESOLVED");
-  } else {
-    return db.recommendation.update({
-      where: { id },
-      data: {
-        subTypes: remainingSubTypes,
-      },
-    });
-  }
+  return updateRecommendationStatus(id, "RESOLVED");
 }
 
 export function deleteRecommendations(shop: string) {
