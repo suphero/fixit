@@ -9,7 +9,7 @@ export const publish = (
   shop: string,
   params: {
     productId?: string;
-    recommendationSubTypes?: RecommendationSubType[];
+    subTypes?: RecommendationSubType[];
   } = {},
 ) => {
   return sendToQueue(QUEUE, JSON.stringify({ shop, params }));

@@ -1,9 +1,10 @@
+import type { Recommendation, Settings, Prisma } from "@prisma/client";
 import {
   RecommendationType,
   RecommendationStatus,
   TargetType,
+  RecommendationSubType,
 } from "@prisma/client";
-import type { Recommendation, RecommendationSubType, Settings, Prisma } from "@prisma/client";
 import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 import {
   getProductUrlFromGid,
@@ -40,22 +41,35 @@ type ProductNode = {
   featuredMedia: { id: string } | null;
 };
 
-function getPricingCriteria(
+function getCriterias(
   settings: Settings,
-  recommendationSubTypes?: RecommendationSubType[],
+  filter: {
+    types?: RecommendationType[];
+    subTypes?: RecommendationSubType[];
+    targetTypes?: TargetType[];
+  },
 ) {
-  let criterias = Object.entries({
-    NO_COST: {
+  let criterias = [
+    {
+      type: RecommendationType.PRICING,
+      subType: RecommendationSubType.NO_COST,
+      targetType: TargetType.PRODUCT_VARIANT,
       filter: (node: ProductVariantNode) =>
         node.inventoryItem?.unitCost === null,
     },
-    FREE: {
+    {
+      type: RecommendationType.PRICING,
+      subType: RecommendationSubType.FREE,
+      targetType: TargetType.PRODUCT_VARIANT,
       filter: (node: ProductVariantNode) => {
         const price = Number(node.price ?? 0);
         return price === 0;
       },
     },
-    SALE_AT_LOSS: {
+    {
+      type: RecommendationType.PRICING,
+      subType: RecommendationSubType.SALE_AT_LOSS,
+      targetType: TargetType.PRODUCT_VARIANT,
       filter: (node: ProductVariantNode) => {
         const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
         const price = Number(node.price ?? 0);
@@ -63,7 +77,10 @@ function getPricingCriteria(
         return price < cost;
       },
     },
-    CHEAP: {
+    {
+      type: RecommendationType.PRICING,
+      subType: RecommendationSubType.CHEAP,
+      targetType: TargetType.PRODUCT_VARIANT,
       filter: (node: ProductVariantNode) => {
         const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
         const price = Number(node.price ?? 0);
@@ -71,7 +88,10 @@ function getPricingCriteria(
         return price >= cost && price < cost * (1 + settings.minRevenueRate);
       },
     },
-    EXPENSIVE: {
+    {
+      type: RecommendationType.PRICING,
+      subType: RecommendationSubType.EXPENSIVE,
+      targetType: TargetType.PRODUCT_VARIANT,
       filter: (node: ProductVariantNode) => {
         const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
         const price = Number(node.price ?? 0);
@@ -79,7 +99,10 @@ function getPricingCriteria(
         return price > cost * (1 + settings.maxRevenueRate);
       },
     },
-    NO_DISCOUNT: {
+    {
+      type: RecommendationType.PRICING,
+      subType: RecommendationSubType.NO_DISCOUNT,
+      targetType: TargetType.PRODUCT_VARIANT,
       filter: (node: ProductVariantNode) => {
         const price = Number(node.price ?? 0);
         const compareAtPrice = Number(node.compareAtPrice ?? 0);
@@ -87,7 +110,10 @@ function getPricingCriteria(
         return compareAtPrice <= price;
       },
     },
-    LOW_DISCOUNT: {
+    {
+      type: RecommendationType.PRICING,
+      subType: RecommendationSubType.LOW_DISCOUNT,
+      targetType: TargetType.PRODUCT_VARIANT,
       filter: (node: ProductVariantNode) => {
         const price = Number(node.price ?? 0);
         const compareAtPrice = Number(node.compareAtPrice ?? 0);
@@ -101,7 +127,10 @@ function getPricingCriteria(
         );
       },
     },
-    HIGH_DISCOUNT: {
+    {
+      type: RecommendationType.PRICING,
+      subType: RecommendationSubType.HIGH_DISCOUNT,
+      targetType: TargetType.PRODUCT_VARIANT,
       filter: (node: ProductVariantNode) => {
         const price = Number(node.price ?? 0);
         const compareAtPrice = Number(node.compareAtPrice ?? 0);
@@ -112,82 +141,64 @@ function getPricingCriteria(
         return discountPercentage > settings.highDiscountRate * 100;
       },
     },
-  });
-
-  if (recommendationSubTypes) {
-    criterias = criterias.filter(([subType]) =>
-      recommendationSubTypes.includes(subType as RecommendationSubType),
-    );
-  }
-
-  return criterias;
-}
-
-function getTextCriteria(
-  settings: Settings,
-  recommendationSubTypes?: RecommendationSubType[],
-) {
-  let criterias = Object.entries({
-    SHORT_TITLE: {
+    {
+      type: RecommendationType.TEXT,
+      subType: RecommendationSubType.SHORT_TITLE,
+      targetType: TargetType.PRODUCT,
       filter: (node: ProductNode) =>
         node.title.length < settings.shortTitleLength,
     },
-    LONG_TITLE: {
+    {
+      type: RecommendationType.TEXT,
+      subType: RecommendationSubType.LONG_TITLE,
+      targetType: TargetType.PRODUCT,
       filter: (node: ProductNode) =>
         node.title.length > settings.longTitleLength,
     },
-    SHORT_DESCRIPTION: {
+    {
+      type: RecommendationType.TEXT,
+      subType: RecommendationSubType.SHORT_DESCRIPTION,
+      targetType: TargetType.PRODUCT,
       filter: (node: ProductNode) =>
         node.description.length < settings.shortDescriptionLength,
     },
-    LONG_DESCRIPTION: {
+    {
+      type: RecommendationType.TEXT,
+      subType: RecommendationSubType.LONG_DESCRIPTION,
+      targetType: TargetType.PRODUCT,
       filter: (node: ProductNode) =>
         node.description.length > settings.longDescriptionLength,
     },
-  });
-
-  if (recommendationSubTypes) {
-    criterias = criterias.filter(([subType]) =>
-      recommendationSubTypes.includes(subType as RecommendationSubType),
-    );
-  }
-
-  return criterias;
-}
-
-function getMediaCriteria(
-  _settings: Settings,
-  recommendationSubTypes?: RecommendationSubType[],
-) {
-  let criterias = Object.entries({
-    NO_IMAGE: {
+    {
+      type: RecommendationType.MEDIA,
+      subType: RecommendationSubType.NO_IMAGE,
+      targetType: TargetType.PRODUCT,
       filter: (node: ProductNode) => node.featuredMedia === null,
     },
-  });
+    {
+      type: RecommendationType.STOCK,
+      subType: RecommendationSubType.NO_STOCK,
+      targetType: TargetType.PRODUCT_VARIANT,
+      filter: (node: ProductVariantNode) =>
+        node.inventoryQuantity === 0 && node.inventoryItem.tracked,
+    },
+  ];
 
-  if (recommendationSubTypes) {
-    criterias = criterias.filter(([subType]) =>
-      recommendationSubTypes.includes(subType as RecommendationSubType),
+  if (filter.types) {
+    criterias = criterias.filter((criteria) =>
+      filter.types?.includes(criteria.type) ?? false,
     );
   }
 
-  return criterias;
-}
+  if (filter.subTypes) {
+    criterias = criterias.filter(
+      (criteria) => filter.subTypes?.includes(criteria.subType) ?? false,
+    );
+  }
 
-function getStockCriteria(
-  _settings: Settings,
-  recommendationSubTypes?: RecommendationSubType[],
-) {
-  let criterias = Object.entries({
-    NO_STOCK: {
-      type: RecommendationType.STOCK,
-      filter: (node: ProductVariantNode) => node.inventoryQuantity === 0 && node.inventoryItem.tracked,
-    },
-  });
-
-  if (recommendationSubTypes) {
-    criterias = criterias.filter(([subType]) =>
-      recommendationSubTypes.includes(subType as RecommendationSubType),
+  if (filter.targetTypes) {
+    criterias = criterias.filter(
+      (criteria) => filter.targetTypes?.includes(criteria.targetType) ?? false,
     );
   }
 
@@ -220,22 +231,25 @@ async function getProductRecommendations(
   settings: Settings,
   params: {
     productId?: string;
-    recommendationSubTypes?: RecommendationSubType[];
+    subTypes?: RecommendationSubType[];
   } = {},
 ) {
-  const textCriterias = getTextCriteria(
-    settings,
-    params?.recommendationSubTypes,
-  );
-  const mediaCriterias = getMediaCriteria(
-    settings,
-    params?.recommendationSubTypes,
-  );
-  const stockCriterias = getStockCriteria(
-    settings,
-    params?.recommendationSubTypes,
-  );
-  if (textCriterias.length === 0 && mediaCriterias.length === 0 && stockCriterias.length === 0) return [];
+  const textCriterias = getCriterias(settings, {
+    types: [RecommendationType.TEXT],
+    subTypes: params?.subTypes,
+    targetTypes: [TargetType.PRODUCT],
+  });
+  const mediaCriterias = getCriterias(settings, {
+    types: [RecommendationType.MEDIA],
+    subTypes: params?.subTypes,
+    targetTypes: [TargetType.PRODUCT],
+  });
+
+  if (
+    textCriterias.length === 0 &&
+    mediaCriterias.length === 0
+  )
+    return [];
 
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
@@ -249,9 +263,9 @@ async function getProductRecommendations(
 
     for (const { node } of edges) {
       if (textCriterias.length > 0) {
-        const textIssues = textCriterias
-          .filter(([, criteria]) => criteria.filter(node))
-          .map(([subType]) => subType as RecommendationSubType);
+        const textIssues = textCriterias.filter((criteria) =>
+          criteria.filter(node),
+        );
 
         if (textIssues.length > 0) {
           recommendations.push({
@@ -262,16 +276,16 @@ async function getProductRecommendations(
             targetTitle: node.title,
             targetUrl: getProductUrlFromGid(node.id),
             type: RecommendationType.TEXT,
-            subTypes: textIssues,
+            subTypes: textIssues.map(({ subType }) => subType),
             status: RecommendationStatus.PENDING,
           });
         }
       }
 
       if (mediaCriterias.length > 0) {
-        const mediaIssues = mediaCriterias
-          .filter(([, criteria]) => criteria.filter(node))
-          .map(([subType]) => subType as RecommendationSubType);
+        const mediaIssues = textCriterias.filter((criteria) =>
+          criteria.filter(node),
+        );
 
         if (mediaIssues.length > 0) {
           recommendations.push({
@@ -282,7 +296,7 @@ async function getProductRecommendations(
             targetTitle: node.title,
             targetUrl: getProductUrlFromGid(node.id),
             type: RecommendationType.MEDIA,
-            subTypes: mediaIssues,
+            subTypes: mediaIssues.map(({ subType }) => subType),
             status: RecommendationStatus.PENDING,
           });
         }
@@ -302,23 +316,22 @@ async function getProductVariantRecommendations(
   settings: Settings,
   params: {
     productId?: string;
-    recommendationSubTypes?: RecommendationSubType[];
+    subTypes?: RecommendationSubType[];
   } = {},
 ) {
-  const pricingCriterias = getPricingCriteria(
-    settings,
-    params?.recommendationSubTypes,
-  );
+  const pricingCriterias = getCriterias(settings, {
+    types: [RecommendationType.PRICING],
+    subTypes: params?.subTypes,
+    targetTypes: [TargetType.PRODUCT_VARIANT],
+  });
 
-  const stockCriterias = getStockCriteria(
-    settings,
-    params?.recommendationSubTypes,
-  );
-  if (
-    pricingCriterias.length === 0 &&
-    stockCriterias.length === 0
-  )
-    return [];
+  const stockCriterias = getCriterias(settings, {
+    types: [RecommendationType.STOCK],
+    subTypes: params?.subTypes,
+    targetTypes: [TargetType.PRODUCT_VARIANT],
+  });
+
+  if (pricingCriterias.length === 0 && stockCriterias.length === 0) return [];
 
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
@@ -345,9 +358,9 @@ async function getProductVariantRecommendations(
       );
 
       if (pricingCriterias.length > 0) {
-        const pricingIssues = pricingCriterias
-          .filter(([, criteria]) => criteria.filter(node))
-          .map(([subType]) => subType as RecommendationSubType);
+        const pricingIssues = pricingCriterias.filter((criteria) =>
+          criteria.filter(node),
+        );
 
         if (pricingIssues.length > 0) {
           recommendations.push({
@@ -358,16 +371,16 @@ async function getProductVariantRecommendations(
             targetTitle,
             targetUrl,
             type: RecommendationType.PRICING,
-            subTypes: pricingIssues,
+            subTypes: pricingIssues.map(({ subType }) => subType),
             status: RecommendationStatus.PENDING,
           });
         }
       }
 
       if (stockCriterias.length > 0) {
-        const stockIssues = stockCriterias
-          .filter(([, criteria]) => criteria.filter(node))
-          .map(([subType]) => subType as RecommendationSubType);
+        const stockIssues = stockCriterias.filter((criteria) =>
+          criteria.filter(node),
+        );
 
         if (stockIssues.length > 0) {
           recommendations.push({
@@ -378,7 +391,7 @@ async function getProductVariantRecommendations(
             targetTitle,
             targetUrl,
             type: RecommendationType.STOCK,
-            subTypes: stockIssues,
+            subTypes: stockIssues.map(({ subType }) => subType),
             status: RecommendationStatus.PENDING,
           });
         }
@@ -439,7 +452,7 @@ export async function generateRecommendations(
   shop: string,
   params: {
     productId?: string;
-    recommendationSubTypes?: RecommendationSubType[];
+    subTypes?: RecommendationSubType[];
   } = {},
 ) {
   console.info("Generating recommendations", { shop, params });
@@ -464,8 +477,8 @@ export async function generateRecommendations(
     where: {
       shop,
       status: RecommendationStatus.PENDING,
-      ...(params?.recommendationSubTypes && {
-        subTypes: { hasSome: params?.recommendationSubTypes },
+      ...(params?.subTypes && {
+        subTypes: { hasSome: params?.subTypes },
       }),
       ...(params?.productId && { productId: params?.productId }),
     },
@@ -559,8 +572,8 @@ export async function updateMedia(
   graphql: AdminGraphqlClient,
   shop: string,
   data: {
-    id: string,
-    image: File,
+    id: string;
+    image: File;
   },
 ) {
   const recommendation = await findRecommendation(shop, data.id);
@@ -606,34 +619,37 @@ export function updateRecommendationsForSettings(
   changes: SettingsChanges,
 ) {
   // Collect all affected subtypes
-  const recommendationSubTypes: RecommendationSubType[] = [];
+  const subTypes: RecommendationSubType[] = [];
 
   // Pricing changes
   if (Object.values(changes.pricing).some(Boolean)) {
-    if (changes.pricing.minRevenueRate) recommendationSubTypes.push("CHEAP");
-    if (changes.pricing.maxRevenueRate) recommendationSubTypes.push("EXPENSIVE");
-    if (changes.pricing.lowDiscountRate) recommendationSubTypes.push("LOW_DISCOUNT");
-    if (changes.pricing.highDiscountRate) recommendationSubTypes.push("HIGH_DISCOUNT");
+    if (changes.pricing.minRevenueRate) subTypes.push("CHEAP");
+    if (changes.pricing.maxRevenueRate)
+      subTypes.push("EXPENSIVE");
+    if (changes.pricing.lowDiscountRate)
+      subTypes.push("LOW_DISCOUNT");
+    if (changes.pricing.highDiscountRate)
+      subTypes.push("HIGH_DISCOUNT");
   }
 
   // Text changes
   if (Object.values(changes.text).some(Boolean)) {
-    if (changes.text.shortTitle) recommendationSubTypes.push("SHORT_TITLE");
-    if (changes.text.longTitle) recommendationSubTypes.push("LONG_TITLE");
+    if (changes.text.shortTitle) subTypes.push("SHORT_TITLE");
+    if (changes.text.longTitle) subTypes.push("LONG_TITLE");
     if (changes.text.shortDescription)
-      recommendationSubTypes.push("SHORT_DESCRIPTION");
+      subTypes.push("SHORT_DESCRIPTION");
     if (changes.text.longDescription)
-      recommendationSubTypes.push("LONG_DESCRIPTION");
+      subTypes.push("LONG_DESCRIPTION");
   }
 
   // Inventory changes
   if (Object.values(changes.inventory).some(Boolean)) {
-    if (changes.inventory.understock) recommendationSubTypes.push("UNDERSTOCK");
-    if (changes.inventory.overstock) recommendationSubTypes.push("OVERSTOCK");
-    if (changes.inventory.passive) recommendationSubTypes.push("PASSIVE");
+    if (changes.inventory.understock) subTypes.push("UNDERSTOCK");
+    if (changes.inventory.overstock) subTypes.push("OVERSTOCK");
+    if (changes.inventory.passive) subTypes.push("PASSIVE");
   }
 
-  return publish(shop, { recommendationSubTypes });
+  return publish(shop, { subTypes: subTypes });
 }
 
 export async function updateStock(
@@ -653,7 +669,7 @@ export async function updateStock(
   await variantBusiness.updateInventory(
     graphql,
     recommendation.variantId,
-    data.quantity
+    data.quantity,
   );
 
   return updateRecommendationStatus(data.id, "RESOLVED");
