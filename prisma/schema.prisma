@@ -80,11 +80,13 @@ enum RecommendationSubType {
   LOW_DISCOUNT
   HIGH_DISCOUNT
 
-  // Definition related
+  // Text related
   SHORT_TITLE
   LONG_TITLE
   SHORT_DESCRIPTION
   LONG_DESCRIPTION
+
+  // Media related
   NO_IMAGE
 
   // Stock related
