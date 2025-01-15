@@ -231,25 +231,18 @@ async function getProductRecommendations(
   settings: Settings,
   params: {
     productId?: string;
+    types?: RecommendationType[];
     subTypes?: RecommendationSubType[];
   } = {},
 ) {
-  const textCriterias = getCriterias(settings, {
-    types: [RecommendationType.TEXT],
-    subTypes: params?.subTypes,
-    targetTypes: [TargetType.PRODUCT],
-  });
-  const mediaCriterias = getCriterias(settings, {
-    types: [RecommendationType.MEDIA],
+  // Get all product-level criteria
+  const criterias = getCriterias(settings, {
+    types: params?.types,
     subTypes: params?.subTypes,
     targetTypes: [TargetType.PRODUCT],
   });
 
-  if (
-    textCriterias.length === 0 &&
-    mediaCriterias.length === 0
-  )
-    return [];
+  if (criterias.length === 0) return [];
 
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
@@ -262,12 +255,21 @@ async function getProductRecommendations(
     });
 
     for (const { node } of edges) {
-      if (textCriterias.length > 0) {
-        const textIssues = textCriterias.filter((criteria) =>
-          criteria.filter(node),
-        );
+      // Find all matching criteria for this node
+      const matchingCriterias = criterias.filter(criteria => criteria.filter(node));
 
-        if (textIssues.length > 0) {
+      if (matchingCriterias.length > 0) {
+        // Group by recommendation type
+        const recommendationsByType = matchingCriterias.reduce((acc, criteria) => {
+          if (!acc[criteria.type]) {
+            acc[criteria.type] = [];
+          }
+          acc[criteria.type].push(criteria.subType);
+          return acc;
+        }, {} as Record<RecommendationType, RecommendationSubType[]>);
+
+        // Create recommendations for each type
+        Object.entries(recommendationsByType).forEach(([type, subTypes]) => {
           recommendations.push({
             shop,
             targetType: TargetType.PRODUCT,
@@ -275,31 +277,11 @@ async function getProductRecommendations(
             variantId: null,
             targetTitle: node.title,
             targetUrl: getProductUrlFromGid(node.id),
-            type: RecommendationType.TEXT,
-            subTypes: textIssues.map(({ subType }) => subType),
+            type: type as RecommendationType,
+            subTypes,
             status: RecommendationStatus.PENDING,
           });
-        }
-      }
-
-      if (mediaCriterias.length > 0) {
-        const mediaIssues = textCriterias.filter((criteria) =>
-          criteria.filter(node),
-        );
-
-        if (mediaIssues.length > 0) {
-          recommendations.push({
-            shop,
-            targetType: TargetType.PRODUCT,
-            productId: node.id,
-            variantId: null,
-            targetTitle: node.title,
-            targetUrl: getProductUrlFromGid(node.id),
-            type: RecommendationType.MEDIA,
-            subTypes: mediaIssues.map(({ subType }) => subType),
-            status: RecommendationStatus.PENDING,
-          });
-        }
+        });
       }
     }
 
@@ -316,22 +298,18 @@ async function getProductVariantRecommendations(
   settings: Settings,
   params: {
     productId?: string;
+    types?: RecommendationType[];
     subTypes?: RecommendationSubType[];
   } = {},
 ) {
-  const pricingCriterias = getCriterias(settings, {
-    types: [RecommendationType.PRICING],
+  // Get all variant-level criteria
+  const criterias = getCriterias(settings, {
+    types: params?.types,
     subTypes: params?.subTypes,
     targetTypes: [TargetType.PRODUCT_VARIANT],
   });
 
-  const stockCriterias = getCriterias(settings, {
-    types: [RecommendationType.STOCK],
-    subTypes: params?.subTypes,
-    targetTypes: [TargetType.PRODUCT_VARIANT],
-  });
-
-  if (pricingCriterias.length === 0 && stockCriterias.length === 0) return [];
+  if (criterias.length === 0) return [];
 
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
   let hasNextPage = true;
@@ -345,56 +323,40 @@ async function getProductVariantRecommendations(
 
     for (const { node } of edges) {
       const isVariantDefault = node.product.hasOnlyDefaultVariant;
-      const targetType = isVariantDefault
-        ? TargetType.PRODUCT
-        : TargetType.PRODUCT_VARIANT;
-      const targetTitle = isVariantDefault
-        ? node.product.title
-        : `${node.product.title} - ${node.title}`;
-      const targetUrl = getProductVariantUrlFromGid(
-        node.product.id,
-        node.id,
-        isVariantDefault,
-      );
 
-      if (pricingCriterias.length > 0) {
-        const pricingIssues = pricingCriterias.filter((criteria) =>
-          criteria.filter(node),
-        );
+      // Find all matching criteria for this node
+      const matchingCriterias = criterias.filter(criteria => criteria.filter(node));
 
-        if (pricingIssues.length > 0) {
+      if (matchingCriterias.length > 0) {
+        // Group by recommendation type
+        const recommendationsByType = matchingCriterias.reduce((acc, criteria) => {
+          if (!acc[criteria.type]) {
+            acc[criteria.type] = [];
+          }
+          acc[criteria.type].push(criteria.subType);
+          return acc;
+        }, {} as Record<RecommendationType, RecommendationSubType[]>);
+
+        // Create recommendations for each type
+        Object.entries(recommendationsByType).forEach(([type, subTypes]) => {
           recommendations.push({
             shop,
-            targetType,
+            targetType: isVariantDefault ? TargetType.PRODUCT : TargetType.PRODUCT_VARIANT,
             productId: node.product.id,
             variantId: node.id,
-            targetTitle,
-            targetUrl,
-            type: RecommendationType.PRICING,
-            subTypes: pricingIssues.map(({ subType }) => subType),
+            targetTitle: isVariantDefault
+              ? node.product.title
+              : `${node.product.title} - ${node.title}`,
+            targetUrl: getProductVariantUrlFromGid(
+              node.product.id,
+              node.id,
+              isVariantDefault,
+            ),
+            type: type as RecommendationType,
+            subTypes,
             status: RecommendationStatus.PENDING,
           });
-        }
-      }
-
-      if (stockCriterias.length > 0) {
-        const stockIssues = stockCriterias.filter((criteria) =>
-          criteria.filter(node),
-        );
-
-        if (stockIssues.length > 0) {
-          recommendations.push({
-            shop,
-            targetType,
-            productId: node.product.id,
-            variantId: node.id,
-            targetTitle,
-            targetUrl,
-            type: RecommendationType.STOCK,
-            subTypes: stockIssues.map(({ subType }) => subType),
-            status: RecommendationStatus.PENDING,
-          });
-        }
+        });
       }
     }
 
@@ -452,6 +414,7 @@ export async function generateRecommendations(
   shop: string,
   params: {
     productId?: string;
+    types?: RecommendationType[];
     subTypes?: RecommendationSubType[];
   } = {},
 ) {
@@ -477,6 +440,7 @@ export async function generateRecommendations(
     where: {
       shop,
       status: RecommendationStatus.PENDING,
+      ...(params?.types && { type: { in: params?.types } }),
       ...(params?.subTypes && {
         subTypes: { hasSome: params?.subTypes },
       }),
