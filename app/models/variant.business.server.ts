@@ -449,6 +449,7 @@ export async function processBulkOperationResult(
   url: string,
   shop: string,
 ): Promise<void> {
+  console.log(`Processing bulk operation result for shop: ${shop} with URL: ${url}`);
   const response = await fetch(url);
   const text = await response.text();
   const lines = text.trim().split("\n");
@@ -464,6 +465,8 @@ export async function processBulkOperationResult(
       tracked: boolean;
     }
   >();
+
+  console.log(`Processing ${lines.length} orders for shop: ${shop}...`);
 
   // Process each order
   lines.forEach((line) => {
