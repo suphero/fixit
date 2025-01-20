@@ -403,6 +403,7 @@ export async function getBulkOperationUrl(
   graphql: AdminGraphqlClient,
   operationId: string,
 ): Promise<string | null> {
+  console.log(`Checking bulk operation status for ID: ${operationId}`);
   const response = await graphql(
     `#graphql
     query getBulkOperationUrl($id: ID!) {

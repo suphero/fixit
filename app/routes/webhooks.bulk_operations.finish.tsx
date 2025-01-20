@@ -4,7 +4,7 @@ import { getBulkOperationUrl, processBulkOperationResult } from "../models/varia
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, admin, payload } = await authenticate.webhook(request);
-  console.log(`Bulk operation finished for shop: ${shop}, status: ${payload.status}, error: ${payload.error_code}`);
+  console.log(`Bulk operation finished for shop: ${shop}, status: ${payload.status}, error: ${payload.error_code}, api_id: ${payload.admin_graphql_api_id}`);
 
   if (payload.status === 'completed' && !payload.error_code && admin) {
     const url = await getBulkOperationUrl(admin.graphql, payload.admin_graphql_api_id);
