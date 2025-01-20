@@ -403,7 +403,7 @@ export async function getBulkOperationUrl(
   graphql: AdminGraphqlClient,
   operationId: string,
 ): Promise<string | null> {
-  console.log(`Checking bulk operation status for ID: ${operationId}`);
+  console.log(`Getting bulk operation Url for ID: ${operationId}`);
   const response = await graphql(
     `#graphql
     query getBulkOperationUrl($id: ID!) {
@@ -421,6 +421,7 @@ export async function getBulkOperationUrl(
   );
 
   const { data } = await response.json();
+  console.log(`Bulk operation URL response, status: ${data.node.status}, error: ${data.node.errorCode}, URL: ${data.node.url}`);
   if (data.node.status === "FAILED") {
     throw new Error(`Bulk operation failed: ${data.node.errorCode}`);
   }
