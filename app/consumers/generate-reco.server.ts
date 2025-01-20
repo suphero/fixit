@@ -1,4 +1,4 @@
-import type { RecommendationSubType } from "@prisma/client";
+import type { RecommendationSubType, RecommendationType } from "@prisma/client";
 import { consumeFromQueue, sendToQueue } from "../mq.server";
 import { generateRecommendations } from "../models/recommendation.business.server";
 import { unauthenticated } from "../shopify.server";
@@ -9,7 +9,9 @@ export const publish = (
   shop: string,
   params: {
     productId?: string;
+    types?: RecommendationType[];
     subTypes?: RecommendationSubType[];
+    premium?: boolean;
   } = {},
 ) => {
   return sendToQueue(QUEUE, JSON.stringify({ shop, params }));

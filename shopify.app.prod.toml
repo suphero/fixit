@@ -26,6 +26,10 @@ api_version = "2025-01"
   topics = [ "app/uninstalled" ]
 
   [[webhooks.subscriptions]]
+  uri = "/webhooks/bulk_operations/finish"
+  topics = [ "bulk_operations/finish" ]
+
+  [[webhooks.subscriptions]]
   uri = "/webhooks/customers/data_request"
   compliance_topics = [ "customers/data_request" ]
 

@@ -1,7 +1,6 @@
 import type { RecommendationStatus , RecommendationType } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import * as business from "./recommendation.business.server";
-import { publish } from "../consumers/generate-reco.server";
 
 export async function getRecommendationsByType(
   request: Request,
@@ -23,8 +22,8 @@ export async function getRecommendationCounts(
 }
 
 export async function initializeAll(request: Request) {
-  const { session } = await authenticate.admin(request);
-  await publish(session.shop);
+  const { session, admin } = await authenticate.admin(request);
+  await business.initializeAll(admin.graphql, session.shop);
 }
 
 export async function updatePricing(

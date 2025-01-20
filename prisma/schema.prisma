@@ -46,6 +46,7 @@ model Recommendation {
   type                RecommendationType
   subTypes            RecommendationSubType[]
   status              RecommendationStatus @default(PENDING)
+  premium             Boolean? @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -123,4 +124,21 @@ model Settings {
   highDiscountRate        Float    @default(70)
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+}
+
+model VariantSalesMetrics {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop            String
+  variantId       String
+  firstOrderDate  DateTime?
+  lastOrderDate   DateTime?
+  totalSold       Int      @default(0)
+  averageDailySales Float  @default(0)
+  lastCalculated  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([shop, variantId])
+  @@index([shop])
+  @@index([variantId])
 }

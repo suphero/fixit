@@ -14,6 +14,7 @@ import db from "../db.server";
 import * as productBusiness from "./product.business.server";
 import * as variantBusiness from "./variant.business.server";
 import * as settingsBusiness from "./settings.business.server";
+import * as shopBusiness from "./shop.business.server";
 import { publish } from "../consumers/generate-reco.server";
 
 type ProductVariantNode = {
@@ -39,6 +40,16 @@ type ProductNode = {
   description: string;
   totalInventory: number;
   featuredMedia: { id: string } | null;
+};
+
+type ProductVariantMetricNode = {
+  id: string;
+  inventoryQuantity: number;
+  inventoryItem: {
+    tracked: boolean;
+  };
+  averageDailySales: number;
+  lastOrderDate: Date | null;
 };
 
 function getCriterias(
@@ -185,8 +196,78 @@ function getCriterias(
   ];
 
   if (filter.types) {
-    criterias = criterias.filter((criteria) =>
-      filter.types?.includes(criteria.type) ?? false,
+    criterias = criterias.filter(
+      (criteria) => filter.types?.includes(criteria.type) ?? false,
+    );
+  }
+
+  if (filter.subTypes) {
+    criterias = criterias.filter(
+      (criteria) => filter.subTypes?.includes(criteria.subType) ?? false,
+    );
+  }
+
+  if (filter.targetTypes) {
+    criterias = criterias.filter(
+      (criteria) => filter.targetTypes?.includes(criteria.targetType) ?? false,
+    );
+  }
+
+  return criterias;
+}
+
+function getPremiumCriterias(
+  settings: Settings,
+  filter: {
+    types?: RecommendationType[];
+    subTypes?: RecommendationSubType[];
+    targetTypes?: TargetType[];
+  },
+) {
+  let criterias = [
+    {
+      type: RecommendationType.STOCK,
+      subType: RecommendationSubType.UNDERSTOCK,
+      targetType: TargetType.PRODUCT_VARIANT,
+      filter(node: ProductVariantMetricNode) {
+        return (
+          node.inventoryItem.tracked &&
+          node.averageDailySales > 0 &&
+          node.inventoryQuantity <
+            node.averageDailySales * settings.understockDays
+        );
+      },
+    },
+    {
+      type: RecommendationType.STOCK,
+      subType: RecommendationSubType.OVERSTOCK,
+      targetType: TargetType.PRODUCT_VARIANT,
+      filter(node: ProductVariantMetricNode) {
+        return (
+          node.inventoryItem.tracked &&
+          node.averageDailySales > 0 &&
+          node.inventoryQuantity >
+            node.averageDailySales * settings.overstockDays
+        );
+      },
+    },
+    {
+      type: RecommendationType.STOCK,
+      subType: RecommendationSubType.PASSIVE,
+      targetType: TargetType.PRODUCT_VARIANT,
+      filter(node: ProductVariantMetricNode) {
+        return (
+          node.lastOrderDate &&
+          node.lastOrderDate.getTime() <
+            Date.now() - settings.passiveDays * 24 * 60 * 60 * 1000
+        );
+      },
+    },
+  ];
+
+  if (filter.types) {
+    criterias = criterias.filter(
+      (criteria) => filter.types?.includes(criteria.type) ?? false,
     );
   }
 
@@ -225,6 +306,29 @@ async function updateRecommendationStatus(
   });
 }
 
+interface RecommendationGroup {
+  type: RecommendationType;
+  subTypes: RecommendationSubType[];
+}
+
+// Add this helper function
+function groupRecommendations(criterias: Array<{
+  type: RecommendationType;
+  subType: RecommendationSubType;
+}>) {
+  return criterias.reduce((acc, criteria) => {
+    const key = criteria.type;
+    if (!acc[key]) {
+      acc[key] = {
+        type: criteria.type,
+        subTypes: [],
+      };
+    }
+    acc[key].subTypes.push(criteria.subType);
+    return acc;
+  }, {} as Record<string, RecommendationGroup>);
+}
+
 async function getProductRecommendations(
   graphql: AdminGraphqlClient,
   shop: string,
@@ -255,21 +359,15 @@ async function getProductRecommendations(
     });
 
     for (const { node } of edges) {
-      // Find all matching criteria for this node
-      const matchingCriterias = criterias.filter(criteria => criteria.filter(node));
+      const matchingCriterias = criterias.filter((criteria) =>
+        criteria.filter(node),
+      );
 
       if (matchingCriterias.length > 0) {
-        // Group by recommendation type
-        const recommendationsByType = matchingCriterias.reduce((acc, criteria) => {
-          if (!acc[criteria.type]) {
-            acc[criteria.type] = [];
-          }
-          acc[criteria.type].push(criteria.subType);
-          return acc;
-        }, {} as Record<RecommendationType, RecommendationSubType[]>);
+        const recommendationGroups = groupRecommendations(matchingCriterias);
 
-        // Create recommendations for each type
-        Object.entries(recommendationsByType).forEach(([type, subTypes]) => {
+        // Create recommendations for each group
+        Object.values(recommendationGroups).forEach(({ type, subTypes }) => {
           recommendations.push({
             shop,
             targetType: TargetType.PRODUCT,
@@ -277,8 +375,9 @@ async function getProductRecommendations(
             variantId: null,
             targetTitle: node.title,
             targetUrl: getProductUrlFromGid(node.id),
-            type: type as RecommendationType,
+            type,
             subTypes,
+            premium: false,
             status: RecommendationStatus.PENDING,
           });
         });
@@ -323,40 +422,38 @@ async function getProductVariantRecommendations(
 
     for (const { node } of edges) {
       const isVariantDefault = node.product.hasOnlyDefaultVariant;
-
-      // Find all matching criteria for this node
-      const matchingCriterias = criterias.filter(criteria => criteria.filter(node));
+      const matchingCriterias = criterias.filter((criteria) =>
+        criteria.filter(node),
+      );
 
       if (matchingCriterias.length > 0) {
-        // Group by recommendation type
-        const recommendationsByType = matchingCriterias.reduce((acc, criteria) => {
-          if (!acc[criteria.type]) {
-            acc[criteria.type] = [];
-          }
-          acc[criteria.type].push(criteria.subType);
-          return acc;
-        }, {} as Record<RecommendationType, RecommendationSubType[]>);
+        const recommendationGroups = groupRecommendations(matchingCriterias);
 
-        // Create recommendations for each type
-        Object.entries(recommendationsByType).forEach(([type, subTypes]) => {
-          recommendations.push({
-            shop,
-            targetType: isVariantDefault ? TargetType.PRODUCT : TargetType.PRODUCT_VARIANT,
-            productId: node.product.id,
-            variantId: node.id,
-            targetTitle: isVariantDefault
-              ? node.product.title
-              : `${node.product.title} - ${node.title}`,
-            targetUrl: getProductVariantUrlFromGid(
-              node.product.id,
-              node.id,
-              isVariantDefault,
-            ),
-            type: type as RecommendationType,
-            subTypes,
-            status: RecommendationStatus.PENDING,
-          });
-        });
+        // Create recommendations for each group
+        Object.values(recommendationGroups).forEach(
+          ({ type, subTypes }) => {
+            recommendations.push({
+              shop,
+              targetType: isVariantDefault
+                ? TargetType.PRODUCT
+                : TargetType.PRODUCT_VARIANT,
+              productId: node.product.id,
+              variantId: node.id,
+              targetTitle: isVariantDefault
+                ? node.product.title
+                : `${node.product.title} - ${node.title}`,
+              targetUrl: getProductVariantUrlFromGid(
+                node.product.id,
+                node.id,
+                isVariantDefault,
+              ),
+              type,
+              subTypes,
+              premium: false,
+              status: RecommendationStatus.PENDING,
+            });
+          },
+        );
       }
     }
 
@@ -367,19 +464,107 @@ async function getProductVariantRecommendations(
   return recommendations;
 }
 
-export function getRecommendationsByType(
+async function getPremiumRecommendations(
+  graphql: AdminGraphqlClient,
+  shop: string,
+  settings: Settings,
+  params: {
+    productId?: string;
+    types?: RecommendationType[];
+    subTypes?: RecommendationSubType[];
+  } = {},
+) {
+  const criterias = getPremiumCriterias(settings, {
+    types: params?.types,
+    subTypes: params?.subTypes,
+  });
+
+  if (criterias.length === 0) return [];
+
+  const recommendations: Prisma.RecommendationCreateManyInput[] = [];
+  let hasNextPage = true;
+  let cursor = null;
+
+  while (hasNextPage) {
+    const { edges, pageInfo } = await variantBusiness.fetchVariant(graphql, {
+      cursor,
+      productId: params?.productId,
+    });
+
+    for (const { node } of edges) {
+      const variantId = node.id;
+      const variantMetric = await variantBusiness.getSalesMetrics(
+        shop,
+        variantId,
+      );
+      if (!variantMetric) continue;
+      const metricNode: ProductVariantMetricNode = {
+        id: variantId,
+        inventoryQuantity: node.inventoryQuantity,
+        inventoryItem: node.inventoryItem,
+        averageDailySales: variantMetric.averageDailySales,
+        lastOrderDate: variantMetric.lastOrderDate,
+      };
+
+      const isVariantDefault = node.product.hasOnlyDefaultVariant;
+      const matchingCriterias = criterias.filter((criteria) =>
+        criteria.filter(metricNode),
+      );
+
+      if (matchingCriterias.length > 0) {
+        const recommendationGroups = groupRecommendations(matchingCriterias);
+
+        // Create recommendations for each group
+        Object.values(recommendationGroups).forEach(
+          ({ type, subTypes }) => {
+            recommendations.push({
+              shop,
+              targetType: isVariantDefault
+                ? TargetType.PRODUCT
+                : TargetType.PRODUCT_VARIANT,
+              productId: node.product.id,
+              variantId,
+              targetTitle: isVariantDefault
+                ? node.product.title
+                : `${node.product.title} - ${node.title}`,
+              targetUrl: getProductVariantUrlFromGid(
+                node.product.id,
+                node.id,
+                isVariantDefault,
+              ),
+              type,
+              subTypes,
+              premium: true,
+              status: RecommendationStatus.PENDING,
+            });
+          },
+        );
+      }
+    }
+
+    hasNextPage = pageInfo.hasNextPage;
+    cursor = hasNextPage ? edges[edges.length - 1].cursor : null;
+  }
+
+  return recommendations;
+}
+
+export async function getRecommendationsByType(
   shop: string,
   type: RecommendationType,
   status: RecommendationStatus,
   page: number,
   size: number,
 ) {
+  const shopDetails = await shopBusiness.getShop(shop);
+  const isFree = shopDetails?.subscriptionName !== "Premium";
   const skip = (page - 1) * size;
   return db.recommendation.findMany({
     where: {
       shop,
       type,
       status,
+      ...(isFree && { premium: false }),
     },
     skip,
     take: size,
@@ -416,7 +601,8 @@ export async function generateRecommendations(
     productId?: string;
     types?: RecommendationType[];
     subTypes?: RecommendationSubType[];
-  } = {},
+    premium?: boolean;
+  },
 ) {
   console.info("Generating recommendations", { shop, params });
   const settings = await settingsBusiness.getShopSettings(shop);
@@ -434,7 +620,13 @@ export async function generateRecommendations(
     settings,
     params,
   );
-  recommendations.push(...productReco, ...variantReco);
+  const premiumReco = await getPremiumRecommendations(
+    graphql,
+    shop,
+    settings,
+    params,
+  );
+  recommendations.push(...productReco, ...variantReco, ...premiumReco);
 
   await db.recommendation.deleteMany({
     where: {
@@ -445,6 +637,7 @@ export async function generateRecommendations(
         subTypes: { hasSome: params?.subTypes },
       }),
       ...(params?.productId && { productId: params?.productId }),
+      ...(params?.premium !== null && { premium: params.premium }),
     },
   });
   if (recommendations.length > 0) {
@@ -557,7 +750,6 @@ export async function updateMedia(
 export function deleteRecommendations(shop: string) {
   return db.recommendation.deleteMany({ where: { shop } });
 }
-
 interface SettingsChanges {
   pricing: {
     minRevenueRate: boolean;
@@ -637,4 +829,9 @@ export async function updateStock(
   );
 
   return updateRecommendationStatus(data.id, "RESOLVED");
+}
+
+export async function initializeAll(graphql: AdminGraphqlClient, shop: string) {
+  await publish(shop, { premium: false });
+  await variantBusiness.startBulkSalesMetricsOperation(graphql);
 }

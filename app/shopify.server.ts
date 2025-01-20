@@ -8,7 +8,7 @@ import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prism
 import prisma from "./db.server";
 import { createShop } from "./models/shop.business.server";
 import { createSettings } from "./models/settings.business.server";
-import { publish } from "./consumers/generate-reco.server";
+import { initializeAll } from "./models/recommendation.business.server";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -18,10 +18,10 @@ const shopify = shopifyApp({
   appUrl: process.env.SHOPIFY_APP_URL ?? "",
   authPathPrefix: "/auth",
   hooks: {
-    afterAuth: async ({ session }) => {
+    afterAuth: async ({ session, admin }) => {
       await createShop(session.shop);
       await createSettings(session.shop);
-      await publish(session.shop);
+      await initializeAll(admin.graphql, session.shop);
     },
   },
   sessionStorage: new PrismaSessionStorage(prisma),
