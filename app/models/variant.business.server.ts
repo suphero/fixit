@@ -442,7 +442,6 @@ export async function processBulkOperationResult(
     .pipeThrough(new TextDecoderStream())
     .getReader();
 
-  // Store variant sales data with a more efficient structure
   const variantSales = new Map<string, {
     firstOrderDate: Date | null;
     lastOrderDate: Date | null;
@@ -453,61 +452,35 @@ export async function processBulkOperationResult(
 
   let currentOrderDate: Date | null = null;
   let processedLines = 0;
-  const BATCH_SIZE = 1000; // Process metrics in larger batches
+  const BATCH_SIZE = 1000;
+  let buffer = ''; // Add buffer for incomplete lines
 
   try {
     while (true) {
       const { value, done } = await reader.read();
-      if (done) break;
+      if (done) {
+        // Process any remaining complete lines in buffer
+        if (buffer.trim()) {
+          processLine(buffer.trim());
+        }
+        break;
+      }
 
-      // Process each line in the chunk
-      const lines = value.split('\n');
-      for (const line of lines) {
-        if (!line.trim()) continue;
+      // Append new chunk to buffer and split into lines
+      buffer += value;
+      const lines = buffer.split('\n');
 
-        try {
-          const data = JSON.parse(line);
-
-          if (data.id?.includes('/Order/')) {
-            currentOrderDate = new Date(data.createdAt);
-          } else if (data.__parentId?.includes('/Order/') && currentOrderDate && data.variant) {
-            const variantId = data.variant.id;
-
-            // Get or create variant data
-            let variantData = variantSales.get(variantId);
-            if (!variantData) {
-              variantData = {
-                firstOrderDate: null,
-                lastOrderDate: null,
-                totalSold: 0,
-                inventoryQuantity: data.variant.inventoryQuantity,
-                tracked: data.variant.inventoryItem.tracked,
-              };
-              variantSales.set(variantId, variantData);
-            }
-
-            // Update sales data
-            if (!variantData.firstOrderDate || currentOrderDate < variantData.firstOrderDate) {
-              variantData.firstOrderDate = currentOrderDate;
-            }
-            if (!variantData.lastOrderDate || currentOrderDate > variantData.lastOrderDate) {
-              variantData.lastOrderDate = currentOrderDate;
-            }
-            variantData.totalSold += data.quantity;
-
-            processedLines++;
-
-            // Process in batches to avoid memory buildup
-            if (processedLines % BATCH_SIZE === 0) {
-              await processBatch(variantSales, shop);
-              variantSales.clear(); // Clear processed data
-            }
-          }
-        } catch (error) {
-          console.error('Error processing line:', error);
-          continue; // Skip problematic lines
+      // Process all complete lines except the last one
+      // (which might be incomplete)
+      for (let i = 0; i < lines.length - 1; i++) {
+        const line = lines[i].trim();
+        if (line) {
+          processLine(line);
         }
       }
+
+      // Keep the last line in buffer as it might be incomplete
+      buffer = lines[lines.length - 1];
     }
 
     // Process remaining variants
@@ -518,6 +491,66 @@ export async function processBulkOperationResult(
     await publish(shop, { premium: true });
   } finally {
     reader.releaseLock();
+  }
+
+  function processLine(line: string) {
+    try {
+      const data = JSON.parse(line);
+
+      if (typeof data !== 'object' || data === null) {
+        console.warn('Skipping invalid JSON object:', line);
+        return;
+      }
+
+      if (data.id?.includes('/Order/')) {
+        currentOrderDate = new Date(data.createdAt);
+      } else if (
+        data.__parentId?.includes('/Order/') &&
+        currentOrderDate &&
+        data.variant &&
+        typeof data.quantity === 'number'
+      ) {
+        const variantId = data.variant.id;
+        if (!variantId) {
+          console.warn('Skipping line item with missing variant ID');
+          return;
+        }
+
+        // Get or create variant data
+        let variantData = variantSales.get(variantId);
+        if (!variantData) {
+          variantData = {
+            firstOrderDate: null,
+            lastOrderDate: null,
+            totalSold: 0,
+            inventoryQuantity: data.variant.inventoryQuantity,
+            tracked: data.variant.inventoryItem?.tracked ?? false,
+          };
+          variantSales.set(variantId, variantData);
+        }
+
+        // Update sales data
+        if (!variantData.firstOrderDate || currentOrderDate < variantData.firstOrderDate) {
+          variantData.firstOrderDate = currentOrderDate;
+        }
+        if (!variantData.lastOrderDate || currentOrderDate > variantData.lastOrderDate) {
+          variantData.lastOrderDate = currentOrderDate;
+        }
+        variantData.totalSold += data.quantity;
+
+        processedLines++;
+
+        // Process in batches to avoid memory buildup
+        if (processedLines % BATCH_SIZE === 0) {
+          processBatch(variantSales, shop).catch(error => {
+            console.error('Error processing batch:', error);
+          });
+          variantSales.clear();
+        }
+      }
+    } catch (error) {
+      console.warn('Error processing line:', line, error);
+    }
   }
 }
 
