@@ -599,6 +599,8 @@ async function processBatch(
       inventoryQuantity: data.inventoryQuantity,
     }));
 
+  await deleteMetrics(shop);
+
   // Process metrics in smaller chunks for database operations
   const DB_BATCH_SIZE = 100;
   for (let i = 0; i < metrics.length; i += DB_BATCH_SIZE) {
