@@ -222,10 +222,12 @@ function getCriterias(
   return criterias;
 }
 
-function isPassive(lastOrderDate: Date | null, passiveDays: number) {
+function isPassive(node: ProductVariantMetricNode, settings: Settings) {
   return (
-    lastOrderDate &&
-    lastOrderDate.getTime() < Date.now() - passiveDays * 24 * 60 * 60 * 1000
+    node.inventoryQuantity > 0 &&
+    node.lastOrderDate &&
+    node.lastOrderDate.getTime() <
+      Date.now() - settings.passiveDays * 24 * 60 * 60 * 1000
   );
 }
 
@@ -253,7 +255,7 @@ function getPremiumCriterias(
       subType: RecommendationSubType.UNDERSTOCK,
       targetType: TargetType.PRODUCT_VARIANT,
       filter(node: ProductVariantMetricNode) {
-        const passive = isPassive(node.lastOrderDate, settings.passiveDays);
+        const passive = isPassive(node, settings);
         const validInventoryRange = hasValidInventoryRange(node.averageDailySales, settings.understockDays, settings.overstockDays);
         return (
           !passive &&
@@ -269,7 +271,7 @@ function getPremiumCriterias(
       subType: RecommendationSubType.OVERSTOCK,
       targetType: TargetType.PRODUCT_VARIANT,
       filter(node: ProductVariantMetricNode) {
-        const passive = isPassive(node.lastOrderDate, settings.passiveDays);
+        const passive = isPassive(node, settings);
         const validInventoryRange = hasValidInventoryRange(node.averageDailySales, settings.understockDays, settings.overstockDays);
         return (
           !passive &&
@@ -285,7 +287,7 @@ function getPremiumCriterias(
       subType: RecommendationSubType.PASSIVE,
       targetType: TargetType.PRODUCT_VARIANT,
       filter(node: ProductVariantMetricNode) {
-        return isPassive(node.lastOrderDate, settings.passiveDays);
+        return isPassive(node, settings);
       },
     },
   ];
