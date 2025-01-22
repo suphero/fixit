@@ -1,5 +1,6 @@
 import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 import db from "../db.server";
+import * as shopBusiness from "./shop.business.server";
 import { publish } from "app/consumers/generate-reco.server";
 
 interface BulkSalesMetrics {
@@ -17,6 +18,7 @@ export async function getDetails(graphql: AdminGraphqlClient, id: string) {
       productVariant(id: $id) {
         price
         compareAtPrice
+        inventoryQuantity
         inventoryItem {
           unitCost {
             amount
@@ -33,11 +35,13 @@ export async function getDetails(graphql: AdminGraphqlClient, id: string) {
   const cost = data.productVariant.inventoryItem?.unitCost?.amount;
   const currentPrice = data.productVariant.price;
   const currentCompareAtPrice = data.productVariant.compareAtPrice;
+  const inventoryQuantity = data.productVariant.inventoryQuantity;
 
   return {
     cost,
     currentPrice,
     currentCompareAtPrice,
+    inventoryQuantity,
   };
 }
 
@@ -282,6 +286,18 @@ async function calculateAndStoreSalesMetrics(
       averageDailySales,
     },
   });
+}
+
+export async function getSalesMetricsForUser(
+  shop: string,
+  variantId: string,
+): Promise<BulkSalesMetrics | null> {
+  const shopDetails = await shopBusiness.getShop(shop);
+  const isFree = shopDetails?.subscriptionName !== "Premium";
+  if (isFree) {
+    return null;
+  }
+  return getSalesMetrics(shop, variantId);
 }
 
 export async function getSalesMetrics(
