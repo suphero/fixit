@@ -260,7 +260,7 @@ async function calculateAndStoreSalesMetrics(
 
   const daysBetween = Math.max(
     1,
-    (new Date(lastOrderDate).getTime() - new Date(firstOrderDate).getTime()) /
+    (new Date().getTime() - new Date(firstOrderDate).getTime()) /
       (1000 * 60 * 60 * 24),
   );
   const averageDailySales = totalSold / daysBetween;
@@ -305,17 +305,16 @@ export async function getSalesMetrics(
 
 export function getStockStatus(
   metrics: {
-    firstOrderDate: Date | null;
     lastOrderDate: Date | null;
-    totalSold: number;
+    averageDailySales: number;
     inventoryQuantity: number;
   },
   settings: {
     passiveDays: number;
     understockDays: number;
     overstockDays: number;
-  },
-): "PASSIVE" | "UNDERSTOCK" | "OVERSTOCK" | null {
+  }
+): 'PASSIVE' | 'UNDERSTOCK' | 'OVERSTOCK' | null {
   const now = new Date();
 
   // Check for passive products
@@ -324,33 +323,24 @@ export function getStockStatus(
       (now.getTime() - metrics.lastOrderDate.getTime()) / (1000 * 60 * 60 * 24)
     );
     if (daysSinceLastOrder > settings.passiveDays) {
-      return "PASSIVE";
+      return 'PASSIVE';
     }
   }
 
   // Skip if no sales history
-  if (!metrics.firstOrderDate || metrics.totalSold === 0) {
+  if (metrics.averageDailySales === 0) {
     return null;
   }
 
-  // Calculate days since first order up to now
-  const totalDays = Math.max(
-    1,
-    Math.floor((now.getTime() - metrics.firstOrderDate.getTime()) / (1000 * 60 * 60 * 24))
-  );
-
-  // Calculate average daily sales using total days up to now
-  const averageDailySales = metrics.totalSold / totalDays;
-
   // Calculate stock status
-  const daysOfStock = metrics.inventoryQuantity / averageDailySales;
+  const daysOfStock = metrics.inventoryQuantity / metrics.averageDailySales;
 
   if (daysOfStock < settings.understockDays) {
-    return "UNDERSTOCK";
+    return 'UNDERSTOCK';
   }
 
   if (daysOfStock > settings.overstockDays) {
-    return "OVERSTOCK";
+    return 'OVERSTOCK';
   }
 
   return null;
