@@ -1,4 +1,4 @@
-import { Modal, TextField, BlockStack, Text, Banner } from "@shopify/polaris";
+import { Modal, TextField, BlockStack, Text } from "@shopify/polaris";
 import type { Recommendation } from "@prisma/client";
 import { useFetcher } from "@remix-run/react";
 import { useState, useEffect } from "react";
@@ -79,36 +79,29 @@ export function UpdateStockModal({ recommendation, onClose }: UpdateStockModalPr
     }
   }, [submitFetcher.state, submitFetcher.data]);
 
-  const isValid = Number(quantity) >= 0;
   const metrics = metricsFetcher.data?.metrics;
   const settings = metricsFetcher.data?.settings;
   const isPremium = metricsFetcher.data?.isPremium;
   const currentInventory = metricsFetcher.data?.currentInventory;
 
-  let suggestedQuantity = null;
-  let suggestion = null;
+  // Validate stock levels and get error messages
+  const getStockError = (value: number): string | undefined => {
+    if (!metrics || !settings) return;
+    if (value === 0) return "Stock cannot be zero";
 
-  if (isPremium && metrics && settings && recommendation?.type === 'STOCK') {
-    const now = new Date();
-    const daysSinceLastOrder = metrics.lastOrderDate
-      ? Math.floor((now.getTime() - new Date(metrics.lastOrderDate).getTime()) / (1000 * 60 * 60 * 24))
-      : 0;
+    const daysOfStock = value / metrics.averageDailySales;
 
-    // Only suggest for active items
-    if (daysSinceLastOrder <= settings.passiveDays) {
-      const daysOfStock = currentInventory / metrics.averageDailySales;
-
-      if (daysOfStock < settings.understockDays) {
-        const targetDays = Math.ceil((settings.understockDays + settings.overstockDays) / 2);
-        suggestedQuantity = Math.ceil(metrics.averageDailySales * targetDays - currentInventory);
-        suggestion = 'UNDERSTOCK';
-      } else if (daysOfStock > settings.overstockDays) {
-        const targetDays = Math.ceil((settings.understockDays + settings.overstockDays) / 2);
-        suggestedQuantity = Math.ceil(metrics.averageDailySales * targetDays - currentInventory);
-        suggestion = 'OVERSTOCK';
-      }
+    if (daysOfStock < settings.understockDays) {
+      return `Stock level too low. Need at least ${Math.ceil(metrics.averageDailySales * settings.understockDays)} units for ${settings.understockDays} days of stock`;
     }
-  }
+
+    if (daysOfStock > settings.overstockDays) {
+      return `Stock level too high. Need at most ${Math.floor(metrics.averageDailySales * settings.overstockDays)} units for ${settings.overstockDays} days of stock`;
+    }
+  };
+
+  const stockError = getStockError(Number(quantity));
+  const isValid = Number(quantity) > 0 && !stockError;
 
   return (
     <Modal
@@ -151,17 +144,6 @@ export function UpdateStockModal({ recommendation, onClose }: UpdateStockModalPr
               {metrics.lastOrderDate && (
                 <Text as="p">Last Order: {new Date(metrics.lastOrderDate).toLocaleDateString()}</Text>
               )}
-              {suggestedQuantity !== null && (
-                <Banner
-                  title={`Suggested ${suggestion === 'UNDERSTOCK' ? 'Increase' : 'Decrease'}`}
-                  tone={suggestion === 'UNDERSTOCK' ? 'warning' : 'info'}
-                >
-                  <Text as="p">
-                    Suggested adjustment: {Math.abs(suggestedQuantity)} units
-                    ({suggestion === 'UNDERSTOCK' ? 'add' : 'remove'})
-                  </Text>
-                </Banner>
-              )}
             </BlockStack>
           )}
           <TextField
@@ -171,8 +153,15 @@ export function UpdateStockModal({ recommendation, onClose }: UpdateStockModalPr
             onChange={setQuantity}
             autoComplete="off"
             min={0}
+            error={stockError}
             helpText="Enter the total inventory quantity"
           />
+          {isPremium && metrics && settings && (
+            <Text as="p" tone="subdued">
+              Stock should cover between {settings.understockDays} and {settings.overstockDays} days
+              ({Math.ceil(metrics.averageDailySales * settings.understockDays)} - {Math.floor(metrics.averageDailySales * settings.overstockDays)} units)
+            </Text>
+          )}
         </BlockStack>
       </Modal.Section>
     </Modal>
