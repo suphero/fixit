@@ -9,7 +9,6 @@ import {
   ButtonGroup,
   Badge,
   Tooltip,
-  Layout,
   Banner,
   BlockStack,
 } from "@shopify/polaris";
@@ -249,85 +248,81 @@ export default function Recommendations() {
 
   return (
     <Page title="Recommendations">
-      <Layout>
-        {!data.isPremium && Object.values(data.counts).some(count => count.premium > 0) && (
-          <Layout.Section>
-            <Banner
-              title="Premium Recommendations Available"
-              tone="warning"
-              action={{
-                content: 'Upgrade to Premium',
-                onAction: () => {
-                  window?.top?.location.replace(data.pricingPlanUrl);
-                },
-              }}
-            >
-              <BlockStack gap="200">
-                <Text as="p">
-                  You have {Object.values(data.counts).reduce((sum, count) => sum + count.premium, 0)} premium recommendations available.
-                  Upgrade to premium to access advanced recommendations and improve your store's performance.
-                </Text>
-              </BlockStack>
-            </Banner>
-          </Layout.Section>
-        )}
-        <IndexFilters
-          tabs={tabs}
-          selected={selectedTab}
-          onSelect={handleTabChange}
-          mode={mode}
-          setMode={setMode}
-          filters={[]}
-          onQueryChange={() => {}}
-          onQueryClear={() => {}}
-          onClearAll={() => {}}
-          canCreateNewView={false}
-          hideFilters
-          hideQueryField
-          loading={isLoading}
-        />
-        <UpdateTextModal
-          recommendation={selectedTextRecommendation}
-          settings={data.settings}
-          onClose={() => setSelectedTextRecommendation(null)}
-        />
-        <UpdateMediaModal
-          recommendation={selectedMediaRecommendation}
-          onClose={() => setSelectedMediaRecommendation(null)}
-        />
-        <UpdatePricingModal
-          recommendation={selectedPricingRecommendation}
-          settings={data.settings}
-          shopData={data.shopData}
-          onClose={() => setSelectedPricingRecommendation(null)}
-        />
-        <UpdateStockModal
-          recommendation={selectedStockRecommendation}
-          onClose={() => setSelectedStockRecommendation(null)}
-        />
-        <IndexTable
-          resourceName={{ singular: "Recommendation", plural: "Recommendations" }}
-          itemCount={totalCount}
-          headings={[
-            { title: "Title" },
-            { title: "Target" },
-            { title: "Issue" },
-            { title: "Date Created" },
-            { title: "" },
-          ]}
-          loading={isLoading}
-          selectable={false}
-          pagination={{
-            hasPrevious: page > 1,
-            onPrevious: () => handlePageChange(page - 1),
-            hasNext: page < Math.ceil(totalCount / PAGE_SIZE),
-            onNext: () => handlePageChange(page + 1),
-            label: paginationLabel,
+      {!data.isPremium && Object.values(data.counts).some(count => count.premium > 0) && (
+        <Banner
+          title="Premium Recommendations Available"
+          tone="warning"
+          action={{
+            content: 'Upgrade to Premium',
+            onAction: () => {
+              window?.top?.location.replace(data.pricingPlanUrl);
+            },
           }}
         >
-          {rowMarkup}
-        </IndexTable>
-      </Layout>
+          <BlockStack gap="200">
+            <Text as="p">
+              You have {Object.values(data.counts).reduce((sum, count) => sum + count.premium, 0)} premium recommendations available.
+              Upgrade to premium to access advanced recommendations and improve your store's performance.
+            </Text>
+          </BlockStack>
+        </Banner>
+      )}
+      <IndexFilters
+        tabs={tabs}
+        selected={selectedTab}
+        onSelect={handleTabChange}
+        mode={mode}
+        setMode={setMode}
+        filters={[]}
+        onQueryChange={() => {}}
+        onQueryClear={() => {}}
+        onClearAll={() => {}}
+        canCreateNewView={false}
+        hideFilters
+        hideQueryField
+        loading={isLoading}
+      />
+      <UpdateTextModal
+        recommendation={selectedTextRecommendation}
+        settings={data.settings}
+        onClose={() => setSelectedTextRecommendation(null)}
+      />
+      <UpdateMediaModal
+        recommendation={selectedMediaRecommendation}
+        onClose={() => setSelectedMediaRecommendation(null)}
+      />
+      <UpdatePricingModal
+        recommendation={selectedPricingRecommendation}
+        settings={data.settings}
+        shopData={data.shopData}
+        onClose={() => setSelectedPricingRecommendation(null)}
+      />
+      <UpdateStockModal
+        recommendation={selectedStockRecommendation}
+        onClose={() => setSelectedStockRecommendation(null)}
+      />
+      <IndexTable
+        resourceName={{ singular: "Recommendation", plural: "Recommendations" }}
+        itemCount={totalCount}
+        headings={[
+          { title: "Title" },
+          { title: "Target" },
+          { title: "Issue" },
+          { title: "Date Created" },
+          { title: "" },
+        ]}
+        loading={isLoading}
+        selectable={false}
+        pagination={{
+          hasPrevious: page > 1,
+          onPrevious: () => handlePageChange(page - 1),
+          hasNext: page < Math.ceil(totalCount / PAGE_SIZE),
+          onNext: () => handlePageChange(page + 1),
+          label: paginationLabel,
+        }}
+      >
+        {rowMarkup}
+      </IndexTable>
     </Page>
   );
 }
