@@ -362,16 +362,24 @@ export function getStockStatus(
   return null;
 }
 
+const getOneYearBefore = () => {
+  const now = new Date();
+  now.setFullYear(now.getFullYear() - 1);
+  const formattedDate = now.toISOString().split('T')[0];
+  return formattedDate;
+};
+
 export async function startBulkSalesMetricsOperation(
   graphql: AdminGraphqlClient,
 ) {
+  const minCreatedAt = getOneYearBefore();
   const response = await graphql(
     `#graphql
     mutation createBulkOperation {
       bulkOperationRunQuery(
         query: """
         {
-          orders(sortKey: CREATED_AT) {
+          orders(first: 10000, reverse: true, query: 'created_at:>=${minCreatedAt} status:closed') {
             edges {
               node {
                 id
