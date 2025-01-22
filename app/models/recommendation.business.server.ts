@@ -608,25 +608,30 @@ export async function generateRecommendations(
   const settings = await settingsBusiness.getShopSettings(shop);
 
   const recommendations: Prisma.RecommendationCreateManyInput[] = [];
-  const productReco = await getProductRecommendations(
-    graphql,
-    shop,
-    settings,
-    params,
-  );
-  const variantReco = await getProductVariantRecommendations(
-    graphql,
-    shop,
-    settings,
-    params,
-  );
-  const premiumReco = await getPremiumRecommendations(
-    graphql,
-    shop,
-    settings,
-    params,
-  );
-  recommendations.push(...productReco, ...variantReco, ...premiumReco);
+  if (params.premium !== true) {
+    const productReco = await getProductRecommendations(
+      graphql,
+      shop,
+      settings,
+      params,
+    );
+    const variantReco = await getProductVariantRecommendations(
+      graphql,
+      shop,
+      settings,
+      params,
+    );
+    recommendations.push(...productReco, ...variantReco);
+  }
+  if (params.premium !== false) {
+    const premiumReco = await getPremiumRecommendations(
+      graphql,
+      shop,
+      settings,
+      params,
+    );
+    recommendations.push(...premiumReco);
+  }
 
   await db.recommendation.deleteMany({
     where: {
