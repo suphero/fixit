@@ -34,6 +34,7 @@ import { UpdatePricingModal } from "./app.reco.update-pricing";
 import { UpdateStockModal } from "./app.reco.update-stock";
 import { getShop } from "../models/shop.server";
 import type { RecommendationCount } from "../models/recommendation.business.server";
+import { SHOPIFY_APP_HANDLE } from "../constants/config.server";
 
 type LoaderData = {
   shop: string;
