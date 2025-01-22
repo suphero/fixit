@@ -428,80 +428,110 @@ export async function getBulkOperationUrl(
   return data.node.url;
 }
 
-interface BulkOperationLine {
-  id: string;
-  createdAt: string;
-  lineItems: {
-    edges: Array<{
-      node: {
-        quantity: number;
-        variant: {
-          id: string;
-          inventoryQuantity: number;
-          inventoryItem: {
-            tracked: boolean;
-          };
-        };
-      };
-    }>;
-  };
-}
-
 export async function processBulkOperationResult(
   url: string,
   shop: string,
 ): Promise<void> {
-  console.log(`Processing bulk operation result for shop: ${shop} with URL: ${url}`);
   const response = await fetch(url);
-  const text = await response.text();
-  const lines = text.trim().split("\n");
+  if (!response.body) {
+    throw new Error('Response body is null');
+  }
 
-  // First, collect all orders data
-  const variantSales = new Map<
-    string,
-    {
-      firstOrderDate: Date | null;
-      lastOrderDate: Date | null;
-      totalSold: number;
-      inventoryQuantity: number;
-      tracked: boolean;
+  // Create a streaming reader
+  const reader = response.body
+    .pipeThrough(new TextDecoderStream())
+    .getReader();
+
+  // Store variant sales data with a more efficient structure
+  const variantSales = new Map<string, {
+    firstOrderDate: Date | null;
+    lastOrderDate: Date | null;
+    totalSold: number;
+    inventoryQuantity: number;
+    tracked: boolean;
+  }>();
+
+  let currentOrderDate: Date | null = null;
+  let processedLines = 0;
+  const BATCH_SIZE = 1000; // Process metrics in larger batches
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      // Process each line in the chunk
+      const lines = value.split('\n');
+      for (const line of lines) {
+        if (!line.trim()) continue;
+
+        try {
+          const data = JSON.parse(line);
+
+          if (data.id?.includes('/Order/')) {
+            currentOrderDate = new Date(data.createdAt);
+          } else if (data.__parentId?.includes('/Order/') && currentOrderDate && data.variant) {
+            const variantId = data.variant.id;
+
+            // Get or create variant data
+            let variantData = variantSales.get(variantId);
+            if (!variantData) {
+              variantData = {
+                firstOrderDate: null,
+                lastOrderDate: null,
+                totalSold: 0,
+                inventoryQuantity: data.variant.inventoryQuantity,
+                tracked: data.variant.inventoryItem.tracked,
+              };
+              variantSales.set(variantId, variantData);
+            }
+
+            // Update sales data
+            if (!variantData.firstOrderDate || currentOrderDate < variantData.firstOrderDate) {
+              variantData.firstOrderDate = currentOrderDate;
+            }
+            if (!variantData.lastOrderDate || currentOrderDate > variantData.lastOrderDate) {
+              variantData.lastOrderDate = currentOrderDate;
+            }
+            variantData.totalSold += data.quantity;
+
+            processedLines++;
+
+            // Process in batches to avoid memory buildup
+            if (processedLines % BATCH_SIZE === 0) {
+              await processBatch(variantSales, shop);
+              variantSales.clear(); // Clear processed data
+            }
+          }
+        } catch (error) {
+          console.error('Error processing line:', error);
+          continue; // Skip problematic lines
+        }
+      }
     }
-  >();
 
-  console.log(`Processing ${lines.length} orders for shop: ${shop}...`);
+    // Process remaining variants
+    if (variantSales.size > 0) {
+      await processBatch(variantSales, shop);
+    }
 
-  // Process each order
-  lines.forEach((line) => {
-    const order = JSON.parse(line) as BulkOperationLine;
-    const orderDate = new Date(order.createdAt);
+    await publish(shop, { premium: true });
+  } finally {
+    reader.releaseLock();
+  }
+}
 
-    // Process each line item
-    order.lineItems.edges.forEach(({ node }) => {
-      const { variant, quantity } = node;
-      if (!variant) return;
-
-      const existing = variantSales.get(variant.id) || {
-        firstOrderDate: null,
-        lastOrderDate: null,
-        totalSold: 0,
-        inventoryQuantity: variant.inventoryQuantity,
-        tracked: variant.inventoryItem?.tracked || false,
-      };
-
-      // Update sales data
-      if (!existing.firstOrderDate || orderDate < existing.firstOrderDate) {
-        existing.firstOrderDate = orderDate;
-      }
-      if (!existing.lastOrderDate || orderDate > existing.lastOrderDate) {
-        existing.lastOrderDate = orderDate;
-      }
-      existing.totalSold += quantity;
-
-      variantSales.set(variant.id, existing);
-    });
-  });
-
-  // Convert to metrics and filter untracked variants
+// Helper function to process a batch of variants
+async function processBatch(
+  variantSales: Map<string, {
+    firstOrderDate: Date | null;
+    lastOrderDate: Date | null;
+    totalSold: number;
+    inventoryQuantity: number;
+    tracked: boolean;
+  }>,
+  shop: string,
+): Promise<void> {
   const metrics = Array.from(variantSales.entries())
     .filter(([_, data]) => data.tracked)
     .map(([variantId, data]) => ({
@@ -512,16 +542,14 @@ export async function processBulkOperationResult(
       inventoryQuantity: data.inventoryQuantity,
     }));
 
-  // Process in batches of 100
-  const batchSize = 100;
-  for (let i = 0; i < metrics.length; i += batchSize) {
-    const batch = metrics.slice(i, i + batchSize);
+  // Process metrics in smaller chunks for database operations
+  const DB_BATCH_SIZE = 100;
+  for (let i = 0; i < metrics.length; i += DB_BATCH_SIZE) {
+    const batch = metrics.slice(i, i + DB_BATCH_SIZE);
     await Promise.all(
-      batch.map((metric) => calculateAndStoreSalesMetrics(shop, metric)),
+      batch.map(metric => calculateAndStoreSalesMetrics(shop, metric))
     );
   }
-
-  await publish(shop, { premium: true });
 }
 
 export function deleteMetrics(shop: string) {
