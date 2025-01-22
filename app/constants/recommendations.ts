@@ -148,7 +148,7 @@ export const TAB_DEFINITIONS: Record<RecommendationType, TabDefinition> = {
       },
       {
         type: "PASSIVE",
-        label: "Inactive Product",
+        label: "Inactive",
         tone: "read-only",
         icon: PauseCircleIcon,
       },
