@@ -229,6 +229,16 @@ function isPassive(lastOrderDate: Date | null, passiveDays: number) {
   );
 }
 
+function hasValidInventoryRange(
+  averageDailySales: number,
+  understockDays: number,
+  overstockDays: number,
+) {
+  const minStock = averageDailySales * understockDays;
+  const maxStock = averageDailySales * overstockDays;
+  return maxStock - minStock > 1;
+}
+
 function getPremiumCriterias(
   settings: Settings,
   filter: {
@@ -244,12 +254,13 @@ function getPremiumCriterias(
       targetType: TargetType.PRODUCT_VARIANT,
       filter(node: ProductVariantMetricNode) {
         const passive = isPassive(node.lastOrderDate, settings.passiveDays);
+        const validInventoryRange = hasValidInventoryRange(node.averageDailySales, settings.understockDays, settings.overstockDays);
         return (
           !passive &&
+          validInventoryRange &&
           node.inventoryItem.tracked &&
           node.averageDailySales > 0 &&
-          node.inventoryQuantity <
-            node.averageDailySales * settings.understockDays
+          node.inventoryQuantity < node.averageDailySales * settings.understockDays
         );
       },
     },
@@ -259,12 +270,13 @@ function getPremiumCriterias(
       targetType: TargetType.PRODUCT_VARIANT,
       filter(node: ProductVariantMetricNode) {
         const passive = isPassive(node.lastOrderDate, settings.passiveDays);
+        const validInventoryRange = hasValidInventoryRange(node.averageDailySales, settings.understockDays, settings.overstockDays);
         return (
           !passive &&
+          validInventoryRange &&
           node.inventoryItem.tracked &&
           node.averageDailySales > 0 &&
-          node.inventoryQuantity >
-            node.averageDailySales * settings.overstockDays
+          node.inventoryQuantity > node.averageDailySales * settings.overstockDays
         );
       },
     },
