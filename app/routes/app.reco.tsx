@@ -9,6 +9,9 @@ import {
   ButtonGroup,
   Badge,
   Tooltip,
+  Layout,
+  Banner,
+  BlockStack,
 } from "@shopify/polaris";
 import {
   ProductIcon,
@@ -29,6 +32,8 @@ import { UpdateTextModal } from "./app.reco.update-text";
 import { UpdateMediaModal } from "./app.reco.update-media";
 import { UpdatePricingModal } from "./app.reco.update-pricing";
 import { UpdateStockModal } from "./app.reco.update-stock";
+import { getShop } from "../models/shop.server";
+import type { RecommendationCount } from "../models/recommendation.business.server";
 
 type LoaderData = {
   shop: string;
@@ -36,7 +41,7 @@ type LoaderData = {
     currencyCode: string;
     moneyFormat: string;
   };
-  counts: Record<RecommendationType, number>;
+  counts: Record<RecommendationType, RecommendationCount>;
   settings: {
     shortTitleLength: number;
     longTitleLength: number;
@@ -56,6 +61,8 @@ type LoaderData = {
       label: string;
     }[];
   }
+  isPremium: boolean;
+  pricingPlanUrl: string;
 };
 
 const PAGE_SIZE = 10;
@@ -83,18 +90,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
   );
   const { data } = await response.json();
 
-  const [typeCounts, settings] = await Promise.all([
+  const [typeCounts, settings, shop] = await Promise.all([
     getRecommendationCounts(request, "PENDING"),
     getShopSettings(request),
+    getShop(request)
   ]);
+
+  const shopId = shop.shop.replace(".myshopify.com", "");
+  const isPremium = shop.subscriptionName !== 'Free';
+  const pricingPlanUrl = `https://admin.shopify.com/store/${shopId}/charges/${SHOPIFY_APP_HANDLE}/pricing_plans`;
 
   let activeTab = null;
   if (type && TAB_DEFINITIONS[type]) {
-    const data = await getRecommendationsByType(request, type, "PENDING", page, size);
+    const recommendations = await getRecommendationsByType(request, type, "PENDING", page, size);
+    // Filter out premium recommendations for non-premium users
+    const filteredData = isPremium ? recommendations : recommendations.filter(r => !r.premium);
+
     activeTab = {
       type,
-      count: typeCounts[type] ?? 0,
-      data,
+      count: isPremium ? typeCounts[type].all : typeCounts[type].free,
+      data: filteredData,
       subTypes: TAB_DEFINITIONS[type].subTypes,
     };
   }
@@ -107,11 +122,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     },
     counts: typeCounts,
     settings,
-    activeTab
+    activeTab,
+    isPremium,
+    pricingPlanUrl,
   };
 }
 
-export default function Index() {
+export default function Recommendations() {
   const fetcher = useFetcher<LoaderData>();
   const data = useLoaderData<LoaderData>();
   const { mode, setMode } = useSetIndexFiltersMode();
@@ -124,10 +141,19 @@ export default function Index() {
 
   const tabs = Object.entries(TAB_DEFINITIONS)
     .map(([type, definition]) => ({
-      content: `${definition.content} (${data.counts[type as RecommendationType] ?? 0})`,
+      content: `${definition.content} (${
+        data.isPremium
+          ? data.counts[type as RecommendationType].all
+          : data.counts[type as RecommendationType].free
+      })`,
       id: type,
     }))
-    .filter((tab) => (data.counts[tab.id as RecommendationType] ?? 0) > 0);
+    .filter((tab) => {
+      const count = data.isPremium
+        ? data.counts[tab.id as RecommendationType].all
+        : data.counts[tab.id as RecommendationType].free;
+      return count > 0;
+    });
 
   useEffect(() => {
     if (!fetcher.data?.activeTab && tabs.length > 0) {
@@ -222,62 +248,85 @@ export default function Index() {
 
   return (
     <Page title="Recommendations">
-      <IndexFilters
-        tabs={tabs}
-        selected={selectedTab}
-        onSelect={handleTabChange}
-        mode={mode}
-        setMode={setMode}
-        filters={[]}
-        onQueryChange={() => {}}
-        onQueryClear={() => {}}
-        onClearAll={() => {}}
-        canCreateNewView={false}
-        hideFilters
-        hideQueryField
-        loading={isLoading}
-      />
-      <UpdateTextModal
-        recommendation={selectedTextRecommendation}
-        settings={data.settings}
-        onClose={() => setSelectedTextRecommendation(null)}
-      />
-      <UpdateMediaModal
-        recommendation={selectedMediaRecommendation}
-        onClose={() => setSelectedMediaRecommendation(null)}
-      />
-      <UpdatePricingModal
-        recommendation={selectedPricingRecommendation}
-        settings={data.settings}
-        shopData={data.shopData}
-        onClose={() => setSelectedPricingRecommendation(null)}
-      />
-      <UpdateStockModal
-        recommendation={selectedStockRecommendation}
-        onClose={() => setSelectedStockRecommendation(null)}
-      />
-      <IndexTable
-        resourceName={{ singular: "Recommendation", plural: "Recommendations" }}
-        itemCount={totalCount}
-        headings={[
-          { title: "Title" },
-          { title: "Target" },
-          { title: "Issue" },
-          { title: "Date Created" },
-          { title: "" },
-        ]}
-        loading={isLoading}
-        selectable={false}
-        pagination={{
-          hasPrevious: page > 1,
-          onPrevious: () => handlePageChange(page - 1),
-          hasNext: page < Math.ceil(totalCount / PAGE_SIZE),
-          onNext: () => handlePageChange(page + 1),
-          label: paginationLabel,
-        }}
-      >
-        {rowMarkup}
-      </IndexTable>
+      <Layout>
+        {!data.isPremium && Object.values(data.counts).some(count => count.premium > 0) && (
+          <Layout.Section>
+            <Banner
+              title="Premium Recommendations Available"
+              tone="warning"
+              action={{
+                content: 'Upgrade to Premium',
+                onAction: () => {
+                  window?.top?.location.replace(data.pricingPlanUrl);
+                },
+              }}
+            >
+              <BlockStack gap="200">
+                <Text as="p">
+                  You have {Object.values(data.counts).reduce((sum, count) => sum + count.premium, 0)} premium recommendations available.
+                  Upgrade to premium to access advanced recommendations and improve your store's performance.
+                </Text>
+              </BlockStack>
+            </Banner>
+          </Layout.Section>
+        )}
+        <IndexFilters
+          tabs={tabs}
+          selected={selectedTab}
+          onSelect={handleTabChange}
+          mode={mode}
+          setMode={setMode}
+          filters={[]}
+          onQueryChange={() => {}}
+          onQueryClear={() => {}}
+          onClearAll={() => {}}
+          canCreateNewView={false}
+          hideFilters
+          hideQueryField
+          loading={isLoading}
+        />
+        <UpdateTextModal
+          recommendation={selectedTextRecommendation}
+          settings={data.settings}
+          onClose={() => setSelectedTextRecommendation(null)}
+        />
+        <UpdateMediaModal
+          recommendation={selectedMediaRecommendation}
+          onClose={() => setSelectedMediaRecommendation(null)}
+        />
+        <UpdatePricingModal
+          recommendation={selectedPricingRecommendation}
+          settings={data.settings}
+          shopData={data.shopData}
+          onClose={() => setSelectedPricingRecommendation(null)}
+        />
+        <UpdateStockModal
+          recommendation={selectedStockRecommendation}
+          onClose={() => setSelectedStockRecommendation(null)}
+        />
+        <IndexTable
+          resourceName={{ singular: "Recommendation", plural: "Recommendations" }}
+          itemCount={totalCount}
+          headings={[
+            { title: "Title" },
+            { title: "Target" },
+            { title: "Issue" },
+            { title: "Date Created" },
+            { title: "" },
+          ]}
+          loading={isLoading}
+          selectable={false}
+          pagination={{
+            hasPrevious: page > 1,
+            onPrevious: () => handlePageChange(page - 1),
+            hasNext: page < Math.ceil(totalCount / PAGE_SIZE),
+            onNext: () => handlePageChange(page + 1),
+            label: paginationLabel,
+          }}
+        >
+          {rowMarkup}
+        </IndexTable>
+      </Layout>
     </Page>
   );
 }

@@ -16,7 +16,7 @@ export async function getRecommendationsByType(
 export async function getRecommendationCounts(
   request: Request,
   status: RecommendationStatus,
-): Promise<Record<RecommendationType, number>> {
+): Promise<Record<RecommendationType, business.RecommendationCount>> {
   const { session } = await authenticate.admin(request);
   return business.getRecommendationCounts(session.shop, status);
 }

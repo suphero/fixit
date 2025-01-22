@@ -52,6 +52,12 @@ type ProductVariantMetricNode = {
   lastOrderDate: Date | null;
 };
 
+export type RecommendationCount = {
+  free: number;
+  premium: number;
+  all: number;
+}
+
 function getCriterias(
   settings: Settings,
   filter: {
@@ -574,10 +580,10 @@ export async function getRecommendationsByType(
 
 export async function getRecommendationCounts(
   shop: string,
-  status: RecommendationStatus,
-): Promise<Record<RecommendationType, number>> {
-  const recommendations = await db.recommendation.groupBy({
-    by: ["type"],
+  status: RecommendationStatus
+): Promise<Record<RecommendationType, RecommendationCount>> {
+  const counts = await db.recommendation.groupBy({
+    by: ['type', 'premium'],
     where: {
       shop,
       status,
@@ -585,13 +591,29 @@ export async function getRecommendationCounts(
     _count: true,
   });
 
-  return recommendations.reduce(
-    (acc, { type, _count }) => ({
-      ...acc,
-      [type]: _count,
-    }),
-    {} as Record<RecommendationType, number>,
-  );
+  // Initialize result with default values
+  const result: Record<RecommendationType, RecommendationCount> = {
+    PRICING: { free: 0, premium: 0, all: 0 },
+    TEXT: { free: 0, premium: 0, all: 0 },
+    MEDIA: { free: 0, premium: 0, all: 0 },
+    STOCK: { free: 0, premium: 0, all: 0 },
+  };
+
+  // Aggregate counts
+  counts.forEach(count => {
+    const type = count.type;
+    const isPremium = count.premium;
+    const countValue = count._count;
+
+    if (isPremium) {
+      result[type].premium += countValue;
+    } else {
+      result[type].free += countValue;
+    }
+    result[type].all += countValue;
+  });
+
+  return result;
 }
 
 export async function generateRecommendations(
