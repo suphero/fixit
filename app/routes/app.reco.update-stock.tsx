@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { updateStock } from "../models/recommendation.server";
 import { getSalesMetrics, getDetails } from "../models/variant.server";
-import { getShop } from "../models/shop.server";
 import { getShopSettings } from "../models/settings.server";
 
 interface UpdateStockModalProps {
@@ -18,22 +17,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const variantId = url.searchParams.get('variantId');
 
   if (!variantId) {
-    return { metrics: null, settings: null, isPremium: false, currentInventory: null };
+    return { metrics: null, settings: null, currentInventory: null };
   }
 
-  const [shop, settings, variantDetails] = await Promise.all([
-    getShop(request),
+  const [settings, variantDetails] = await Promise.all([
     getShopSettings(request),
     getDetails(request, variantId)
   ]);
 
-  const isPremium = shop.subscriptionName !== 'Free';
-  const metrics = isPremium ? await getSalesMetrics(request, variantId) : null;
+  const metrics = await getSalesMetrics(request, variantId);
 
   return {
     metrics,
     settings,
-    isPremium,
     currentInventory: variantDetails.inventoryQuantity
   };
 }
@@ -81,13 +77,12 @@ export function UpdateStockModal({ recommendation, onClose }: UpdateStockModalPr
 
   const metrics = metricsFetcher.data?.metrics;
   const settings = metricsFetcher.data?.settings;
-  const isPremium = metricsFetcher.data?.isPremium;
   const currentInventory = metricsFetcher.data?.currentInventory;
 
-  // Validate stock levels and get error messages
   const getStockError = (value: number): string | undefined => {
-    if (!metrics || !settings) return;
     if (value === 0) return "Stock cannot be zero";
+
+    if (!metrics || !settings) return;
 
     const daysOfStock = value / metrics.averageDailySales;
 
@@ -136,7 +131,7 @@ export function UpdateStockModal({ recommendation, onClose }: UpdateStockModalPr
     >
       <Modal.Section>
         <BlockStack gap="400">
-          {isPremium && metrics && (
+          {metrics && (
             <BlockStack gap="200">
               <Text as="h3" variant="headingMd">Current Metrics</Text>
               <Text as="p">Average Daily Sales: {metrics.averageDailySales.toFixed(2)} units</Text>
@@ -156,7 +151,7 @@ export function UpdateStockModal({ recommendation, onClose }: UpdateStockModalPr
             error={stockError}
             helpText="Enter the total inventory quantity"
           />
-          {isPremium && metrics && settings && (
+          {metrics && settings && (
             <Text as="p" tone="subdued">
               Stock should cover between {settings.understockDays} and {settings.overstockDays} days
               ({Math.ceil(metrics.averageDailySales * settings.understockDays)} - {Math.floor(metrics.averageDailySales * settings.overstockDays)} units)
