@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS: Omit<
   highDiscountRate: 70,
   understockDays: 7,
   overstockDays: 60,
-  passiveDays: 180,
+  passiveDays: 30,
 };
 
 export async function getShopSettings(shop: string): Promise<Settings> {

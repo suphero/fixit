@@ -115,7 +115,7 @@ model Settings {
   overstockDays           Int      @default(60)
   minRevenueRate          Float    @default(10)
   maxRevenueRate          Float    @default(90)
-  passiveDays             Int      @default(180)
+  passiveDays             Int      @default(30)
   shortTitleLength        Int      @default(20)
   longTitleLength         Int      @default(70)
   shortDescriptionLength  Int      @default(80)
