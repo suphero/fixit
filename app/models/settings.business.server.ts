@@ -90,10 +90,13 @@ function isTextChanged(old: Settings, new_: Settings) {
 }
 
 function isInventoryChanged(old: Settings, new_: Settings) {
+  const isUnderstockChanged = old.understockDays !== new_.understockDays;
+  const isOverstockChanged = old.overstockDays !== new_.overstockDays;
+  const isPassiveChanged = old.passiveDays !== new_.passiveDays;
   return {
-    understock: old.understockDays !== new_.understockDays,
-    overstock: old.overstockDays !== new_.overstockDays,
-    passive: old.passiveDays !== new_.passiveDays,
+    understock: isUnderstockChanged || isPassiveChanged,
+    overstock: isOverstockChanged || isPassiveChanged,
+    passive: isUnderstockChanged || isOverstockChanged || isPassiveChanged,
   };
 }
 
