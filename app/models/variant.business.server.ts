@@ -379,7 +379,7 @@ export async function startBulkSalesMetricsOperation(
       bulkOperationRunQuery(
         query: """
         {
-          orders(first: 10000, reverse: true, query: 'created_at:>=${minCreatedAt} status:closed') {
+          orders(first: 10000, reverse: true, query: "created_at:>=${minCreatedAt} status:closed") {
             edges {
               node {
                 id
