@@ -103,7 +103,7 @@ function getCriterias(
         const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
         const price = Number(node.price ?? 0);
         if (cost === 0 || price === 0) return false;
-        return price >= cost && price < cost * (1 + settings.minRevenueRate);
+        return price >= cost && price < cost * (1 + settings.minRevenueRate / 100);
       },
     },
     {
@@ -114,7 +114,7 @@ function getCriterias(
         const cost = Number(node.inventoryItem?.unitCost?.amount ?? 0);
         const price = Number(node.price ?? 0);
         if (cost === 0 || price === 0) return false;
-        return price > cost * (1 + settings.maxRevenueRate);
+        return price > cost * (1 + settings.maxRevenueRate / 100);
       },
     },
     {
