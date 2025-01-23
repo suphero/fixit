@@ -66,7 +66,7 @@ export async function fetchProduct(
 ) {
   let query = "status:active";
   if (params.productId) {
-    query += ` AND id:${params.productId}`;
+    query += ` id:${params.productId}`;
   }
   const response = await graphql(
     `#graphql
