@@ -1,4 +1,4 @@
-import { Modal, DropZone, Thumbnail, Label, BlockStack } from "@shopify/polaris";
+import { Modal, DropZone, Thumbnail, BlockStack } from "@shopify/polaris";
 import type { Recommendation } from "@prisma/client";
 import { useFetcher } from "@remix-run/react";
 import { useState, useEffect, useCallback } from "react";
@@ -15,13 +15,32 @@ export async function action({ request }: ActionFunctionArgs) {
   const recommendationId = formData.get('recommendationId') as string;
   const image = formData.get('image') as File;
 
-  await updateMedia(request, recommendationId, image);
+  await updateMedia(request, {
+    id: recommendationId,
+    file: image,
+  });
   return { success: true };
 }
 
 export function UpdateMediaModal({ recommendation, onClose }: UpdateMediaModalProps) {
   const submitFetcher = useFetcher<typeof action>();
   const [files, setFiles] = useState<File[]>([]);
+
+  const fileUpload = !files.length && <DropZone.FileUpload actionHint="or drop files to upload" />;
+  const uploadedFiles = files.length > 0 && (
+    <BlockStack>
+      {files.map((file, index) => (
+        <BlockStack align="center" key={index}>
+          <Thumbnail
+            size="large"
+            alt={file.name}
+            source={window.URL.createObjectURL(file)}
+          />
+          {file.name}
+        </BlockStack>
+      ))}
+    </BlockStack>
+  );
 
   const handleClose = () => {
     setFiles([]);
@@ -50,16 +69,17 @@ export function UpdateMediaModal({ recommendation, onClose }: UpdateMediaModalPr
       primaryAction={{
         content: 'Update',
         onAction: () => {
-          if (!recommendation) {
-            throw new Error('Recommendation is required');
+          if (!recommendation || !files[0]) {
+            throw new Error('Recommendation and image are required');
           }
           const formData = new FormData();
           formData.append('recommendationId', recommendation.id);
-          formData.append('image', files[0]);
+          formData.append('image', files[0], files[0].name);
 
           submitFetcher.submit(formData, {
             method: 'post',
-            action: '/app/reco/update-media'
+            action: '/app/reco/update-media',
+            encType: 'multipart/form-data'
           });
         },
         loading: submitFetcher.state === 'submitting',
@@ -75,18 +95,9 @@ export function UpdateMediaModal({ recommendation, onClose }: UpdateMediaModalPr
     >
       <Modal.Section>
         <BlockStack gap="400">
-          <Label id="lblMedia">Media</Label>
-          <DropZone onDrop={handleDrop} allowMultiple={false}>
-            <DropZone.FileUpload actionHint="or drop files to upload" />
-            {files.length > 0 && (
-              <BlockStack>
-                <Thumbnail
-                  size="small"
-                  alt={files[0].name}
-                  source={window.URL.createObjectURL(files[0])}
-                />
-              </BlockStack>
-            )}
+          <DropZone accept="image/*" type="image" onDrop={handleDrop}>
+            {uploadedFiles}
+            {fileUpload}
           </DropZone>
         </BlockStack>
       </Modal.Section>

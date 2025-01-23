@@ -46,6 +46,7 @@ model Recommendation {
   type                RecommendationType
   subTypes            RecommendationSubType[]
   status              RecommendationStatus @default(PENDING)
+  premium             Boolean? @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -64,7 +65,8 @@ enum TargetType {
 
 enum RecommendationType {
   PRICING
-  DEFINITION
+  TEXT
+  MEDIA
   STOCK
 }
 
@@ -79,11 +81,13 @@ enum RecommendationSubType {
   LOW_DISCOUNT
   HIGH_DISCOUNT
 
-  // Definition related
+  // Text related
   SHORT_TITLE
   LONG_TITLE
   SHORT_DESCRIPTION
   LONG_DESCRIPTION
+
+  // Media related
   NO_IMAGE
 
   // Stock related
@@ -109,15 +113,32 @@ model Settings {
   shop                    String   @unique
   understockDays          Int      @default(7)
   overstockDays           Int      @default(60)
-  minRevenueRate          Float    @default(0.1)
-  maxRevenueRate          Float    @default(0.9)
-  passiveDays             Int      @default(180)
+  minRevenueRate          Float    @default(10)
+  maxRevenueRate          Float    @default(90)
+  passiveDays             Int      @default(30)
   shortTitleLength        Int      @default(20)
   longTitleLength         Int      @default(70)
   shortDescriptionLength  Int      @default(80)
   longDescriptionLength   Int      @default(400)
-  lowDiscountRate         Float    @default(0.05)
-  highDiscountRate        Float    @default(0.7)
+  lowDiscountRate         Float    @default(5)
+  highDiscountRate        Float    @default(70)
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+}
+
+model VariantMetric {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop              String
+  variantId         String
+  variantCreatedAt  DateTime
+  lastOrderDate     DateTime?
+  totalSold         Int      @default(0)
+  averageDailySales Float    @default(0)
+  lastCalculated    DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([shop, variantId])
+  @@index([shop])
+  @@index([variantId])
 }

@@ -3,6 +3,7 @@ import { deleteShop } from "../models/shop.business.server";
 import { deleteRecommendations } from "../models/recommendation.business.server";
 import { deleteSettings } from "../models/settings.business.server";
 import { deleteSession } from "../models/session.business.server";
+import { deleteMetrics } from "../models/variant.business.server";
 
 const QUEUE = "delete_shop";
 
@@ -23,6 +24,7 @@ export const consume = () =>
 
       console.log(`Starting deletion process for shop: ${shop}`);
 
+      await deleteMetrics(shop);
       await deleteShop(shop);
       await deleteRecommendations(shop);
       await deleteSettings(shop);

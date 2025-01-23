@@ -45,7 +45,7 @@ export async function action({ request }: ActionFunctionArgs) {
         maxRevenueRate: Number(formData.get("maxRevenueRate")),
         lowDiscountRate: Number(formData.get("lowDiscountRate")),
         highDiscountRate: Number(formData.get("highDiscountRate")),
-        // Content
+        // Text
         shortTitleLength: Number(formData.get("shortTitleLength")),
         longTitleLength: Number(formData.get("longTitleLength")),
         shortDescriptionLength: Number(formData.get("shortDescriptionLength")),
@@ -201,7 +201,7 @@ export default function Settings() {
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
-              <Text variant="headingMd" as="h2">Content Settings</Text>
+              <Text variant="headingMd" as="h2">Text Settings</Text>
 
               <Box padding="400">
                 <BlockStack gap="400">

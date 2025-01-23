@@ -1,7 +1,8 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { isAuthorized, unauthorizedResponse } from "../utils/auth.server";
-import { publish } from "../consumers/generate-reco.server";
 import { getAllSessions } from "../models/session.business.server";
+import { unauthenticated } from "../shopify.server";
+import { initializeAll } from "../models/recommendation.business.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   if (!isAuthorized(request)) {
@@ -10,7 +11,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const sessions = await getAllSessions();
   for (const session of sessions) {
-    await publish(session.shop);
+    const { admin } = await unauthenticated.admin(session.shop);
+    await initializeAll(admin.graphql, session.shop);
   }
 
   return new Response(null, { status: 200 });
