@@ -4,7 +4,7 @@ import { useFetcher } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { updateStock } from "../models/recommendation.server";
-import { getSalesMetrics, getDetails } from "../models/variant.server";
+import { getVariantMetrics, getDetails } from "../models/variant.server";
 import { getShopSettings } from "../models/settings.server";
 
 interface UpdateStockModalProps {
@@ -25,7 +25,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     getDetails(request, variantId)
   ]);
 
-  const metrics = await getSalesMetrics(request, variantId);
+  const metrics = await getVariantMetrics(request, variantId);
 
   return {
     metrics,
@@ -136,8 +136,8 @@ export function UpdateStockModal({ recommendation, onClose }: UpdateStockModalPr
               <Text as="h3" variant="headingMd">Current Metrics</Text>
               <Text as="p">Average Daily Sales: {metrics.averageDailySales.toFixed(2)} units</Text>
               <Text as="p">Current Inventory: {currentInventory} units</Text>
-              {metrics.lastOrderDate && (
-                <Text as="p">Last Order: {new Date(metrics.lastOrderDate).toLocaleDateString()}</Text>
+              {metrics.lastActivity && (
+                <Text as="p">Last Activity: {new Date(metrics.lastActivity).toLocaleDateString()}</Text>
               )}
             </BlockStack>
           )}

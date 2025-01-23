@@ -49,6 +49,7 @@ type ProductVariantMetricNode = {
     tracked: boolean;
   };
   averageDailySales: number;
+  variantCreatedAt: Date;
   lastOrderDate: Date | null;
 };
 
@@ -223,12 +224,14 @@ function getCriterias(
 }
 
 function isPassive(node: ProductVariantMetricNode, settings: Settings) {
-  return (
-    node.inventoryQuantity > 0 &&
-    node.lastOrderDate &&
-    node.lastOrderDate.getTime() <
-      Date.now() - settings.passiveDays * 24 * 60 * 60 * 1000
-  );
+  if (!node.inventoryQuantity || node.inventoryQuantity <= 0) {
+    return false;
+  }
+
+  const now = new Date();
+  // Use lastOrderDate if exists, otherwise use variantCreatedAt
+  const lastActivity = node.lastOrderDate || node.variantCreatedAt;
+  return lastActivity.getTime() < now.getTime() - settings.passiveDays * 24 * 60 * 60 * 1000;
 }
 
 function hasValidInventoryRange(
@@ -520,7 +523,7 @@ async function getPremiumRecommendations(
 
     for (const { node } of edges) {
       const variantId = node.id;
-      const variantMetric = await variantBusiness.getSalesMetrics(
+      const variantMetric = await variantBusiness.getVariantMetrics(
         shop,
         variantId,
       );
@@ -530,6 +533,7 @@ async function getPremiumRecommendations(
         inventoryQuantity: node.inventoryQuantity,
         inventoryItem: node.inventoryItem,
         averageDailySales: variantMetric.averageDailySales,
+        variantCreatedAt: variantMetric.variantCreatedAt,
         lastOrderDate: variantMetric.lastOrderDate,
       };
 
@@ -881,7 +885,7 @@ export async function updateStock(
 
 export async function initializeAll(graphql: AdminGraphqlClient, shop: string) {
   await publish(shop, { premium: false });
-  await variantBusiness.startBulkSalesMetricsOperation(graphql);
+  await variantBusiness.startBulkVariantMetricsOperation(graphql);
 }
 
 export async function archiveProduct(

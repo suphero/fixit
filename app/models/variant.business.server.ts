@@ -3,9 +3,9 @@ import db from "../db.server";
 import * as shopBusiness from "./shop.business.server";
 import { publish } from "app/consumers/generate-reco.server";
 
-interface BulkSalesMetrics {
+interface BulkVariantMetrics {
   variantId: string;
-  firstOrderDate: Date | null;
+  variantCreatedAt: Date;
   lastOrderDate: Date | null;
   totalSold: number;
   averageDailySales: number;
@@ -213,63 +213,61 @@ export async function updateInventory(
   return adjustResponse.json();
 }
 
-async function calculateAndStoreSalesMetrics(
+async function calculateAndStoreVariantMetrics(
   shop: string,
   metrics: {
     variantId: string;
-    firstOrderDate: Date | null;
-    lastActivity: Date;
+    variantCreatedAt: Date;
+    lastOrderDate: Date | null;
     totalSold: number;
     inventoryQuantity: number;
   },
 ) {
-  const { variantId, firstOrderDate, lastActivity, totalSold } = metrics;
+  const { variantId, variantCreatedAt, lastOrderDate, totalSold } = metrics;
 
   // Calculate average daily sales
   let averageDailySales = 0;
-  if (firstOrderDate) {
-    const daysSinceFirstOrder = Math.max(
-      1,
-      Math.floor((new Date().getTime() - firstOrderDate.getTime()) / (1000 * 60 * 60 * 24))
-    );
-    averageDailySales = totalSold / daysSinceFirstOrder;
-  }
+  const daysSinceFirstOrder = Math.max(
+    1,
+    Math.floor((new Date().getTime() - variantCreatedAt.getTime()) / (1000 * 60 * 60 * 24))
+  );
+  averageDailySales = totalSold / daysSinceFirstOrder;
 
   return db.variantMetric.upsert({
     where: { shop_variantId: { shop, variantId } },
     create: {
       shop,
       variantId,
-      firstOrderDate,
-      lastActivity,
+      variantCreatedAt,
+      lastOrderDate,
       totalSold,
-      averageDailySales
+      averageDailySales,
     },
     update: {
-      firstOrderDate,
-      lastActivity,
+      variantCreatedAt,
+      lastOrderDate,
       totalSold,
-      averageDailySales
+      averageDailySales,
     },
   });
 }
 
-export async function getSalesMetricsForUser(
+export async function getVariantMetricsForUser(
   shop: string,
   variantId: string,
-): Promise<BulkSalesMetrics | null> {
+): Promise<BulkVariantMetrics | null> {
   const shopDetails = await shopBusiness.getShop(shop);
   const isFree = shopDetails?.subscriptionName !== "Premium";
   if (isFree) {
     return null;
   }
-  return getSalesMetrics(shop, variantId);
+  return getVariantMetrics(shop, variantId);
 }
 
-export async function getSalesMetrics(
+export async function getVariantMetrics(
   shop: string,
   variantId: string,
-): Promise<BulkSalesMetrics | null> {
+): Promise<BulkVariantMetrics | null> {
   const data = await db.variantMetric.findUnique({
     where: { shop_variantId: { shop, variantId } },
   });
@@ -278,8 +276,8 @@ export async function getSalesMetrics(
 
   return {
     variantId: data.variantId,
-    firstOrderDate: data.firstOrderDate,
-    lastOrderDate: data.lastActivity,
+    variantCreatedAt: data.variantCreatedAt,
+    lastOrderDate: data.lastOrderDate,
     totalSold: data.totalSold,
     averageDailySales: data.averageDailySales,
   };
@@ -335,7 +333,7 @@ const getOneYearBefore = () => {
   return formattedDate;
 };
 
-export async function startBulkSalesMetricsOperation(
+export async function startBulkVariantMetricsOperation(
   graphql: AdminGraphqlClient,
 ) {
   const minCreatedAt = getOneYearBefore();
@@ -452,12 +450,11 @@ export async function processBulkOperationResult(
     .getReader();
 
   const variantMetrics = new Map<string, {
-    firstOrderDate: Date | null;
+    variantCreatedAt: Date;
     lastOrderDate: Date | null;
     totalSold: number;
     inventoryQuantity: number;
     tracked: boolean;
-    createdAt: Date;
   }>();
 
   let currentOrderDate: Date | null = null;
@@ -516,12 +513,11 @@ export async function processBulkOperationResult(
         // Process variant data
         if (data.inventoryItem?.tracked) {
           variantMetrics.set(data.id, {
-            firstOrderDate: null,
+            variantCreatedAt: new Date(data.createdAt),
             lastOrderDate: null,
             totalSold: 0,
             inventoryQuantity: data.inventoryQuantity,
             tracked: data.inventoryItem.tracked,
-            createdAt: new Date(data.createdAt)
           });
         }
       } else if (data.id?.includes('/Order/')) {
@@ -532,11 +528,6 @@ export async function processBulkOperationResult(
         const variantId = data.variant.id;
         const variantData = variantMetrics.get(variantId);
         if (!variantData) return;
-
-        // Update first order date
-        if (!variantData.firstOrderDate || currentOrderDate < variantData.firstOrderDate) {
-          variantData.firstOrderDate = currentOrderDate;
-        }
 
         // Update last order date
         if (!variantData.lastOrderDate || currentOrderDate > variantData.lastOrderDate) {
@@ -564,25 +555,21 @@ export async function processBulkOperationResult(
 // Helper function to process a batch of variants
 async function processBatch(
   variantMetrics: Map<string, {
-    firstOrderDate: Date | null;
+    variantCreatedAt: Date;
     lastOrderDate: Date | null;
     totalSold: number;
     inventoryQuantity: number;
     tracked: boolean;
-    createdAt: Date;
   }>,
   shop: string,
 ): Promise<void> {
   const metrics = Array.from(variantMetrics.entries())
     .filter(([_, data]) => data.tracked)
     .map(([variantId, data]) => {
-      // Use last order date if exists, otherwise use creation date
-      const lastActivity = data.lastOrderDate || data.createdAt;
-
       return {
         variantId,
-        firstOrderDate: data.firstOrderDate,
-        lastActivity,
+        variantCreatedAt: data.variantCreatedAt,
+        lastOrderDate: data.lastOrderDate,
         totalSold: data.totalSold,
         inventoryQuantity: data.inventoryQuantity
       };
@@ -595,7 +582,7 @@ async function processBatch(
   for (let i = 0; i < metrics.length; i += DB_BATCH_SIZE) {
     const batch = metrics.slice(i, i + DB_BATCH_SIZE);
     await Promise.all(
-      batch.map(metric => calculateAndStoreSalesMetrics(shop, metric))
+      batch.map(metric => calculateAndStoreVariantMetrics(shop, metric))
     );
   }
 }

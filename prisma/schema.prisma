@@ -128,15 +128,15 @@ model Settings {
 
 model VariantMetric {
   id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  shop             String
-  variantId        String
-  firstOrderDate   DateTime?
-  lastActivity     DateTime
-  totalSold        Int      @default(0)
-  averageDailySales Float   @default(0)
-  lastCalculated   DateTime @default(now())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  shop              String
+  variantId         String
+  variantCreatedAt  DateTime
+  lastOrderDate     DateTime?
+  totalSold         Int      @default(0)
+  averageDailySales Float    @default(0)
+  lastCalculated    DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@unique([shop, variantId])
   @@index([shop])
