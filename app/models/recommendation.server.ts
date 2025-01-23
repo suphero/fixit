@@ -72,3 +72,19 @@ export async function updateStock(
   const { admin, session } = await authenticate.admin(request);
   return business.updateStock(admin.graphql, session.shop, data);
 }
+
+export async function archiveProduct(
+  request: Request,
+  id: string,
+) {
+  const { admin, session } = await authenticate.admin(request);
+  return business.archiveProduct(admin.graphql, session.shop, id);
+}
+
+export async function deleteVariant(
+  request: Request,
+  id: string,
+) {
+  const { admin, session } = await authenticate.admin(request);
+  return business.deleteVariant(admin.graphql, session.shop, id);
+}

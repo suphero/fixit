@@ -187,3 +187,24 @@ export async function updateImage(
   const updateProductData = await updateProductResponse.json();
   return updateProductData;
 }
+
+export function archiveProduct(
+  graphql: AdminGraphqlClient,
+  id: string
+) {
+   return graphql(
+    `#graphql
+    mutation archiveProduct($id: ID!) {
+      productDelete(input: { id: $id }) {
+        deletedProductId
+        userErrors {
+          field
+          message
+        }
+      }
+    }`,
+    {
+      variables: { id },
+    }
+  );
+}

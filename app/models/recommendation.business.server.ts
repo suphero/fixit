@@ -883,3 +883,30 @@ export async function initializeAll(graphql: AdminGraphqlClient, shop: string) {
   await publish(shop, { premium: false });
   await variantBusiness.startBulkSalesMetricsOperation(graphql);
 }
+
+export async function archiveProduct(
+  graphql: AdminGraphqlClient,
+  shop: string,
+  id: string,
+) {
+  const recommendation = await findRecommendation(shop, id);
+  if (!recommendation) throw new Error("Recommendation not found");
+  if (!recommendation.productId) throw new Error("Product not found");
+
+  await productBusiness.archiveProduct(graphql, recommendation.productId);
+  return updateRecommendationStatus(id, "RESOLVED");
+}
+
+export async function deleteVariant(
+  graphql: AdminGraphqlClient,
+  shop: string,
+  id: string,
+) {
+  const recommendation = await findRecommendation(shop, id);
+  if (!recommendation) throw new Error("Recommendation not found");
+  if (!recommendation.productId) throw new Error("Product not found");
+  if (!recommendation.variantId) throw new Error("Variant not found");
+
+  await variantBusiness.deleteVariant(graphql, recommendation.productId, recommendation.variantId);
+  return updateRecommendationStatus(id, "RESOLVED");
+}

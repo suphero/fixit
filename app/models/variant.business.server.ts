@@ -614,3 +614,26 @@ async function processBatch(
 export function deleteMetrics(shop: string) {
   return db.variantSalesMetrics.deleteMany({ where: { shop } });
 }
+
+export function deleteVariant(graphql: AdminGraphqlClient, productId: string, variantId: string) {
+  return graphql(
+    `#graphql
+      mutation ProductVariantsDelete($productId: ID!, $variantsIds: [ID!]!) {
+        productVariantsBulkDelete(productId: $productId, variantsIds: $variantsIds) {
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `,
+    {
+      variables: {
+        productId,
+        variantsIds: [
+          variantId,
+        ],
+      },
+    },
+  );
+}

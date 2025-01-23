@@ -27,6 +27,7 @@ import {
 import { TAB_DEFINITIONS, getSubTypeDefinition } from "../constants/recommendations";
 import { getShopSettings } from "../models/settings.server";
 import { getShopifyAdminUrl } from "../utils/url";
+import { ArchiveModal } from "./app.reco.archive";
 import { UpdateTextModal } from "./app.reco.update-text";
 import { UpdateMediaModal } from "./app.reco.update-media";
 import { UpdatePricingModal } from "./app.reco.update-pricing";
@@ -138,6 +139,7 @@ export default function Recommendations() {
   const [selectedTextRecommendation, setSelectedTextRecommendation] = useState<Recommendation | null>(null);
   const [selectedMediaRecommendation, setSelectedMediaRecommendation] = useState<Recommendation | null>(null);
   const [selectedStockRecommendation, setSelectedStockRecommendation] = useState<Recommendation | null>(null);
+  const [selectedArchiveRecommendation, setSelectedArchiveRecommendation] = useState<Recommendation | null>(null);
 
   const tabs = Object.entries(TAB_DEFINITIONS)
     .map(([type, definition]) => ({
@@ -228,11 +230,17 @@ export default function Recommendations() {
           {recommendation.type === "MEDIA" && (
             <Button onClick={() => setSelectedMediaRecommendation(recommendation)} variant="primary">Fix</Button>
           )}
-          {recommendation.type === "STOCK" && (
-            <Button onClick={() => setSelectedStockRecommendation(recommendation)} variant="primary">
-              Fix
-            </Button>
-          )}
+          {recommendation.type === "STOCK" && (() => {
+            if (recommendation.subTypes.includes("PASSIVE")) {
+              if (recommendation.targetType === "PRODUCT") {
+                return <Button onClick={() => setSelectedArchiveRecommendation(recommendation)} variant="primary">Archive</Button>;
+              } else {
+                return <Button onClick={() => setSelectedArchiveRecommendation(recommendation)} variant="primary">Delete</Button>;
+              }
+            } else {
+              return <Button onClick={() => setSelectedStockRecommendation(recommendation)} variant="primary">Fix</Button>;
+            }
+          })()}
         </ButtonGroup>
       </IndexTable.Cell>
     </IndexTable.Row>
@@ -300,6 +308,10 @@ export default function Recommendations() {
       <UpdateStockModal
         recommendation={selectedStockRecommendation}
         onClose={() => setSelectedStockRecommendation(null)}
+      />
+      <ArchiveModal
+        recommendation={selectedArchiveRecommendation}
+        onClose={() => setSelectedArchiveRecommendation(null)}
       />
       <IndexTable
         resourceName={{ singular: "Recommendation", plural: "Recommendations" }}
