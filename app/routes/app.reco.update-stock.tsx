@@ -17,7 +17,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const variantId = url.searchParams.get('variantId');
 
   if (!variantId) {
-    return { metrics: null, settings: null, currentInventory: null };
+    return { metrics: null, settings: null, currentInventory: null, hasValidRange: false };
   }
 
   const [settings, variantDetails] = await Promise.all([
@@ -27,10 +27,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const metrics = await getVariantMetrics(request, variantId);
 
+  let hasValidRange = false;
+  if (metrics && settings) {
+    const minStock = metrics.averageDailySales * settings.understockDays;
+    const maxStock = metrics.averageDailySales * settings.overstockDays;
+    hasValidRange = maxStock - minStock > 1;
+  }
+
   return {
     metrics,
     settings,
-    currentInventory: variantDetails.inventoryQuantity
+    currentInventory: variantDetails.inventoryQuantity,
+    hasValidRange,
   };
 }
 
@@ -78,11 +86,12 @@ export function UpdateStockModal({ recommendation, onClose }: UpdateStockModalPr
   const metrics = metricsFetcher.data?.metrics;
   const settings = metricsFetcher.data?.settings;
   const currentInventory = metricsFetcher.data?.currentInventory;
+  const hasValidRange = metricsFetcher.data?.hasValidRange;
 
   const getStockError = (value: number): string | undefined => {
     if (value === 0) return "Stock cannot be zero";
 
-    if (!metrics || !settings) return;
+    if (!metrics || !settings || !hasValidRange) return;
 
     const daysOfStock = value / metrics.averageDailySales;
 
@@ -151,7 +160,7 @@ export function UpdateStockModal({ recommendation, onClose }: UpdateStockModalPr
             error={stockError}
             helpText="Enter the total inventory quantity"
           />
-          {metrics && settings && (
+          {metrics && settings && hasValidRange && (
             <Text as="p" tone="subdued">
               Stock should cover between {settings.understockDays} and {settings.overstockDays} days
               ({Math.ceil(metrics.averageDailySales * settings.understockDays)} - {Math.floor(metrics.averageDailySales * settings.overstockDays)} units)
