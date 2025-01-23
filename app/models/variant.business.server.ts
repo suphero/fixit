@@ -133,28 +133,6 @@ export function updatePricing(
   );
 }
 
-export async function isVariantDefault(
-  graphql: AdminGraphqlClient,
-  variantId: string,
-): Promise<boolean> {
-  const response = await graphql(
-    `#graphql
-    query getProductVariant($id: ID!) {
-      productVariant(id: $id) {
-        product {
-          hasOnlyDefaultVariant
-        }
-      }
-    }`,
-    {
-      variables: { id: variantId },
-    },
-  );
-
-  const { data } = await response.json();
-  return data.productVariant.product.hasOnlyDefaultVariant;
-}
-
 export async function updateInventory(
   graphql: AdminGraphqlClient,
   variantId: string,
@@ -240,50 +218,38 @@ async function calculateAndStoreSalesMetrics(
   metrics: {
     variantId: string;
     firstOrderDate: Date | null;
-    lastOrderDate: Date | null;
+    lastActivity: Date;
     totalSold: number;
+    inventoryQuantity: number;
   },
 ) {
-  const { variantId, firstOrderDate, lastOrderDate, totalSold } = metrics;
+  const { variantId, firstOrderDate, lastActivity, totalSold } = metrics;
 
-  if (!firstOrderDate || !lastOrderDate) {
-    return db.variantSalesMetrics.upsert({
-      where: { shop_variantId: { shop, variantId } },
-      create: {
-        shop,
-        variantId,
-        totalSold,
-        averageDailySales: 0,
-      },
-      update: {
-        totalSold,
-        averageDailySales: 0,
-      },
-    });
+  // Calculate average daily sales
+  let averageDailySales = 0;
+  if (firstOrderDate) {
+    const daysSinceFirstOrder = Math.max(
+      1,
+      Math.floor((new Date().getTime() - firstOrderDate.getTime()) / (1000 * 60 * 60 * 24))
+    );
+    averageDailySales = totalSold / daysSinceFirstOrder;
   }
 
-  const daysBetween = Math.max(
-    1,
-    (new Date().getTime() - new Date(firstOrderDate).getTime()) /
-      (1000 * 60 * 60 * 24),
-  );
-  const averageDailySales = totalSold / daysBetween;
-
-  return db.variantSalesMetrics.upsert({
+  return db.variantMetric.upsert({
     where: { shop_variantId: { shop, variantId } },
     create: {
       shop,
       variantId,
-      firstOrderDate: new Date(firstOrderDate),
-      lastOrderDate: new Date(lastOrderDate),
+      firstOrderDate,
+      lastActivity,
       totalSold,
-      averageDailySales,
+      averageDailySales
     },
     update: {
-      firstOrderDate: new Date(firstOrderDate),
-      lastOrderDate: new Date(lastOrderDate),
+      firstOrderDate,
+      lastActivity,
       totalSold,
-      averageDailySales,
+      averageDailySales
     },
   });
 }
@@ -304,7 +270,7 @@ export async function getSalesMetrics(
   shop: string,
   variantId: string,
 ): Promise<BulkSalesMetrics | null> {
-  const data = await db.variantSalesMetrics.findUnique({
+  const data = await db.variantMetric.findUnique({
     where: { shop_variantId: { shop, variantId } },
   });
 
@@ -313,7 +279,7 @@ export async function getSalesMetrics(
   return {
     variantId: data.variantId,
     firstOrderDate: data.firstOrderDate,
-    lastOrderDate: data.lastOrderDate,
+    lastOrderDate: data.lastActivity,
     totalSold: data.totalSold,
     averageDailySales: data.averageDailySales,
   };
@@ -379,21 +345,40 @@ export async function startBulkSalesMetricsOperation(
       bulkOperationRunQuery(
         query: """
         {
+          products(query: "status:ACTIVE") {
+            edges {
+              node {
+                id
+                createdAt
+                hasOnlyDefaultVariant
+                status
+                variants {
+                  edges {
+                    node {
+                      id
+                      createdAt
+                      inventoryQuantity
+                      inventoryItem {
+                        tracked
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
           orders(first: 10000, reverse: true, query: "created_at:>=${minCreatedAt} status:closed") {
             edges {
               node {
                 id
                 createdAt
                 lineItems {
+                  id
                   edges {
                     node {
                       quantity
                       variant {
                         id
-                        inventoryQuantity
-                        inventoryItem {
-                          tracked
-                        }
                       }
                     }
                   }
@@ -466,12 +451,13 @@ export async function processBulkOperationResult(
     .pipeThrough(new TextDecoderStream())
     .getReader();
 
-  const variantSales = new Map<string, {
+  const variantMetrics = new Map<string, {
     firstOrderDate: Date | null;
     lastOrderDate: Date | null;
     totalSold: number;
     inventoryQuantity: number;
     tracked: boolean;
+    createdAt: Date;
   }>();
 
   let currentOrderDate: Date | null = null;
@@ -508,8 +494,8 @@ export async function processBulkOperationResult(
     }
 
     // Process remaining variants
-    if (variantSales.size > 0) {
-      await processBatch(variantSales, shop);
+    if (variantMetrics.size > 0) {
+      await processBatch(variantMetrics, shop);
     }
 
     await publish(shop, { premium: true });
@@ -526,50 +512,47 @@ export async function processBulkOperationResult(
         return;
       }
 
-      if (data.id?.includes('/Order/')) {
-        currentOrderDate = new Date(data.createdAt);
-      } else if (
-        data.__parentId?.includes('/Order/') &&
-        currentOrderDate &&
-        data.variant &&
-        typeof data.quantity === 'number'
-      ) {
-        const variantId = data.variant.id;
-        if (!variantId) {
-          console.warn('Skipping line item with missing variant ID');
-          return;
-        }
-
-        // Get or create variant data
-        let variantData = variantSales.get(variantId);
-        if (!variantData) {
-          variantData = {
+      if (data.__parentId?.includes('/Product/')) {
+        // Process variant data
+        if (data.inventoryItem?.tracked) {
+          variantMetrics.set(data.id, {
             firstOrderDate: null,
             lastOrderDate: null,
             totalSold: 0,
-            inventoryQuantity: data.variant.inventoryQuantity,
-            tracked: data.variant.inventoryItem?.tracked ?? false,
-          };
-          variantSales.set(variantId, variantData);
+            inventoryQuantity: data.inventoryQuantity,
+            tracked: data.inventoryItem.tracked,
+            createdAt: new Date(data.createdAt)
+          });
         }
+      } else if (data.id?.includes('/Order/')) {
+        // Store current order date for subsequent line items
+        currentOrderDate = new Date(data.createdAt);
+      } else if (data.id?.includes('/LineItem/') && currentOrderDate && data.variant?.id) {
+        // Process line item
+        const variantId = data.variant.id;
+        const variantData = variantMetrics.get(variantId);
+        if (!variantData) return;
 
-        // Update sales data
+        // Update first order date
         if (!variantData.firstOrderDate || currentOrderDate < variantData.firstOrderDate) {
           variantData.firstOrderDate = currentOrderDate;
         }
+
+        // Update last order date
         if (!variantData.lastOrderDate || currentOrderDate > variantData.lastOrderDate) {
           variantData.lastOrderDate = currentOrderDate;
         }
+
         variantData.totalSold += data.quantity;
 
         processedLines++;
 
         // Process in batches to avoid memory buildup
         if (processedLines % BATCH_SIZE === 0) {
-          processBatch(variantSales, shop).catch(error => {
+          processBatch(variantMetrics, shop).catch(error => {
             console.error('Error processing batch:', error);
           });
-          variantSales.clear();
+          variantMetrics.clear();
         }
       }
     } catch (error) {
@@ -580,24 +563,30 @@ export async function processBulkOperationResult(
 
 // Helper function to process a batch of variants
 async function processBatch(
-  variantSales: Map<string, {
+  variantMetrics: Map<string, {
     firstOrderDate: Date | null;
     lastOrderDate: Date | null;
     totalSold: number;
     inventoryQuantity: number;
     tracked: boolean;
+    createdAt: Date;
   }>,
   shop: string,
 ): Promise<void> {
-  const metrics = Array.from(variantSales.entries())
+  const metrics = Array.from(variantMetrics.entries())
     .filter(([_, data]) => data.tracked)
-    .map(([variantId, data]) => ({
-      variantId,
-      firstOrderDate: data.firstOrderDate,
-      lastOrderDate: data.lastOrderDate,
-      totalSold: data.totalSold,
-      inventoryQuantity: data.inventoryQuantity,
-    }));
+    .map(([variantId, data]) => {
+      // Use last order date if exists, otherwise use creation date
+      const lastActivity = data.lastOrderDate || data.createdAt;
+
+      return {
+        variantId,
+        firstOrderDate: data.firstOrderDate,
+        lastActivity,
+        totalSold: data.totalSold,
+        inventoryQuantity: data.inventoryQuantity
+      };
+    });
 
   await deleteMetrics(shop);
 
@@ -612,7 +601,7 @@ async function processBatch(
 }
 
 export function deleteMetrics(shop: string) {
-  return db.variantSalesMetrics.deleteMany({ where: { shop } });
+  return db.variantMetric.deleteMany({ where: { shop } });
 }
 
 export function deleteVariant(graphql: AdminGraphqlClient, productId: string, variantId: string) {
