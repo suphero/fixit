@@ -141,7 +141,7 @@ function getCriterias(
           ((compareAtPrice - price) / compareAtPrice) * 100;
         return (
           discountPercentage > 0 &&
-          discountPercentage < settings.lowDiscountRate * 100
+          discountPercentage < settings.lowDiscountRate
         );
       },
     },
@@ -156,7 +156,7 @@ function getCriterias(
 
         const discountPercentage =
           ((compareAtPrice - price) / compareAtPrice) * 100;
-        return discountPercentage > settings.highDiscountRate * 100;
+        return discountPercentage > settings.highDiscountRate;
       },
     },
     {
