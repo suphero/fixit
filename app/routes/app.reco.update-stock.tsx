@@ -136,8 +136,8 @@ export function UpdateStockModal({ recommendation, onClose }: UpdateStockModalPr
               <Text as="h3" variant="headingMd">Current Metrics</Text>
               <Text as="p">Average Daily Sales: {metrics.averageDailySales.toFixed(2)} units</Text>
               <Text as="p">Current Inventory: {currentInventory} units</Text>
-              {metrics.lastActivity && (
-                <Text as="p">Last Activity: {new Date(metrics.lastActivity).toLocaleDateString()}</Text>
+              {metrics.lastOrderDate && (
+                <Text as="p">Last Order Date: {new Date(metrics.lastOrderDate).toLocaleDateString()}</Text>
               )}
             </BlockStack>
           )}
