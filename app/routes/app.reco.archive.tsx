@@ -75,7 +75,7 @@ export function ArchiveModal({ recommendation, onClose }: ArchiveModalProps) {
       <Modal.Section>
         <BlockStack gap="400">
           <Text as="p">
-            Are you sure you want to {isProduct ? "archive this product" : "delete this variant"}? This action cannot be undone.
+            Are you sure you want to {isProduct ? "archive this product?" : "delete this variant? This action cannot be undone."}
           </Text>
           <Text as="p" tone="subdued">
             Target: {recommendation?.targetTitle}
