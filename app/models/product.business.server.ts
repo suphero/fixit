@@ -30,6 +30,7 @@ export async function updateProduct(
   input: {
     title?: string;
     descriptionHtml?: string;
+    status?: string;
   }
 ) {
   return graphql(
@@ -40,6 +41,7 @@ export async function updateProduct(
           id
           title
           descriptionHtml
+          status
         }
         userErrors {
           field
@@ -188,30 +190,3 @@ export async function updateImage(
   return updateProductData;
 }
 
-export function archiveProduct(
-  graphql: AdminGraphqlClient,
-  productId: string
-) {
-  return graphql(
-    `#graphql
-    mutation productChangeStatus($productId: ID!, $status: ProductStatus!) {
-      productChangeStatus(productId: $productId, status: $status) {
-        product {
-          id
-          status
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-  `,
-    {
-      variables: {
-        productId,
-        status: "ARCHIVED"
-      },
-    }
-  );
-}

@@ -893,7 +893,7 @@ export async function archiveProduct(
   if (!recommendation) throw new Error("Recommendation not found");
   if (!recommendation.productId) throw new Error("Product not found");
 
-  await productBusiness.archiveProduct(graphql, recommendation.productId);
+  await productBusiness.updateProduct(graphql, recommendation.productId, { status: "ARCHIVED" });
   return updateRecommendationStatus(id, "RESOLVED");
 }
 
