@@ -373,9 +373,9 @@ export async function startBulkSalesMetricsOperation(
                 id
                 createdAt
                 lineItems {
-                  id
                   edges {
                     node {
+                      id
                       quantity
                       variant {
                         id
