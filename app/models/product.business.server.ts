@@ -190,21 +190,28 @@ export async function updateImage(
 
 export function archiveProduct(
   graphql: AdminGraphqlClient,
-  id: string
+  productId: string
 ) {
-   return graphql(
+  return graphql(
     `#graphql
-    mutation archiveProduct($id: ID!) {
-      productDelete(input: { id: $id }) {
-        deletedProductId
+    mutation productChangeStatus($productId: ID!, $status: ProductStatus!) {
+      productChangeStatus(productId: $productId, status: $status) {
+        product {
+          id
+          status
+        }
         userErrors {
           field
           message
         }
       }
-    }`,
+    }
+  `,
     {
-      variables: { id },
+      variables: {
+        productId,
+        status: "ARCHIVED"
+      },
     }
   );
 }
