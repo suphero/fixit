@@ -35,6 +35,10 @@ const shopify = shopifyApp({
     : {}),
 });
 
+if (!process.env.SHOPIFY_API_SECRET) {
+  console.warn("SHOPIFY_API_SECRET is not set. Webhook authentication will fail.");
+}
+
 export default shopify;
 export const apiVersion = ApiVersion.October24;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
