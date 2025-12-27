@@ -22,6 +22,7 @@ const shopify = shopifyApp({
       await createShop(session.shop);
       await createSettings(session.shop);
       await initializeAll(admin.graphql, session.shop);
+      await registerWebhooks({ session });
     },
   },
   sessionStorage: new PrismaSessionStorage(prisma),
