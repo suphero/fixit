@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "887110872f7dd4f2d175308b5bef27aa"
-application_url = "https://smart-forecast-prod.suphero.store"
+application_url = "https://smart-forecast-prod.suphero.online"
 embedded = true
 name = "Smart Forecast"
 handle = "smart-forecast"
@@ -47,7 +47,7 @@ api_version = "2025-01"
 
 [auth]
 redirect_urls = [
-  "https://smart-forecast-prod.suphero.store/auth/callback",
+  "https://smart-forecast-prod.suphero.online/auth/callback",
 ]
 
 [pos]
