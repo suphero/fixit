@@ -52,3 +52,13 @@ export async function getShop(shop: string): Promise<Shop> {
 
   return response;
 }
+
+export async function completeOnboarding(shop: string): Promise<Shop> {
+  return db.shop.update({
+    where: { shop },
+    data: {
+      onboardingCompleted: true,
+      onboardingCompletedAt: new Date(),
+    },
+  });
+}

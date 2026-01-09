@@ -27,12 +27,14 @@ model Session {
 }
 
 model Shop {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  shop              String   @unique
-  subscriptionId    String?
-  subscriptionName  Subscription @default(Free)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop                  String   @unique
+  subscriptionId        String?
+  subscriptionName      Subscription @default(Free)
+  onboardingCompleted   Boolean  @default(false)
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model Recommendation {

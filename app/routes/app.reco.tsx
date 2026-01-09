@@ -40,6 +40,7 @@ import {
   calculateTotalImpact,
   type RecommendationWithImpact,
 } from "../models/recommendation-impact.server";
+import { RecommendationsLoader } from "../components/RecommendationsLoader";
 
 type LoaderData = {
   shop: string;
@@ -300,11 +301,7 @@ export default function Recommendations() {
   });
 
   if (tabs.length === 0) {
-    return (
-      <Page title="Recommendations">
-        <Text as="span">No recommendations available.</Text>
-      </Page>
-    );
+    return <RecommendationsLoader />;
   }
 
   return (
