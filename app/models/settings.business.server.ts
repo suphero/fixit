@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS: Omit<
   understockDays: 7,
   overstockDays: 60,
   passiveDays: 30,
+  lastReinitializeAt: null,
 };
 
 export async function getShopSettings(shop: string): Promise<Settings> {
@@ -103,5 +104,33 @@ function isInventoryChanged(old: Settings, new_: Settings) {
 export async function deleteSettings(shop: string) {
   return db.settings.deleteMany({
     where: { shop },
+  });
+}
+
+const REINITIALIZE_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+
+export async function canReinitialize(shop: string): Promise<{ allowed: boolean; remainingMs: number }> {
+  const settings = await getShopSettings(shop);
+
+  if (!settings.lastReinitializeAt) {
+    return { allowed: true, remainingMs: 0 };
+  }
+
+  const now = Date.now();
+  const lastReinitialize = settings.lastReinitializeAt.getTime();
+  const timeSinceLastReinitialize = now - lastReinitialize;
+
+  if (timeSinceLastReinitialize >= REINITIALIZE_COOLDOWN_MS) {
+    return { allowed: true, remainingMs: 0 };
+  }
+
+  const remainingMs = REINITIALIZE_COOLDOWN_MS - timeSinceLastReinitialize;
+  return { allowed: false, remainingMs };
+}
+
+export async function updateLastReinitializeAt(shop: string): Promise<Settings> {
+  return db.settings.update({
+    where: { shop },
+    data: { lastReinitializeAt: new Date() },
   });
 }

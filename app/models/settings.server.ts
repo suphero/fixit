@@ -14,3 +14,13 @@ export async function updateShopSettings(
   const { session } = await authenticate.admin(request);
   return business.updateShopSettings(session.shop, settings);
 }
+
+export async function canReinitialize(request: Request): Promise<{ allowed: boolean; remainingMs: number }> {
+  const { session } = await authenticate.admin(request);
+  return business.canReinitialize(session.shop);
+}
+
+export async function updateLastReinitializeAt(request: Request): Promise<Settings> {
+  const { session } = await authenticate.admin(request);
+  return business.updateLastReinitializeAt(session.shop);
+}

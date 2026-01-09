@@ -135,6 +135,7 @@ model Settings {
   longDescriptionLength   Int      @default(400)
   lowDiscountRate         Float    @default(5)
   highDiscountRate        Float    @default(70)
+  lastReinitializeAt      DateTime?
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 }

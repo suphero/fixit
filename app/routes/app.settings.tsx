@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Page,
   Layout,
@@ -14,8 +14,9 @@ import {
   InlineStack,
 } from "@shopify/polaris";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import { getShopSettings, updateShopSettings } from "../models/settings.server";
+import { getShopSettings, updateShopSettings, canReinitialize, updateLastReinitializeAt } from "../models/settings.server";
 import { getShop } from "../models/shop.server";
 import { initializeAll } from "../models/recommendation.server";
 import { SHOPIFY_APP_HANDLE } from "../constants/config.server";
@@ -26,8 +27,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const shopId = shop.shop.replace(".myshopify.com", "");
   const planName = shop.subscriptionName;
   const pricingPlanUrl = `https://admin.shopify.com/store/${shopId}/charges/${SHOPIFY_APP_HANDLE}/pricing_plans`;
+  const reinitializeStatus = await canReinitialize(request);
 
-  return { settings, planName, pricingPlanUrl };
+  return json({ settings, planName, pricingPlanUrl, reinitializeStatus });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -35,9 +37,24 @@ export async function action({ request }: ActionFunctionArgs) {
   const action = formData.get("action");
 
   switch (action) {
-    case "reinitialize":
+    case "reinitialize": {
+      const status = await canReinitialize(request);
+
+      if (!status.allowed) {
+        return json(
+          {
+            success: false,
+            error: "Please wait before reinitializing again." as string | undefined,
+            remainingMs: status.remainingMs
+          },
+          { status: 429 }
+        );
+      }
+
       await initializeAll(request);
-      return { success: true };
+      await updateLastReinitializeAt(request);
+      return json({ success: true, error: undefined as string | undefined });
+    }
     case "submit": {
       const updates = {
         // Pricing
@@ -57,7 +74,7 @@ export async function action({ request }: ActionFunctionArgs) {
       };
 
       await updateShopSettings(request, updates);
-      return { success: true };
+      return json({ success: true });
     }
     default:
       throw new Error(`Invalid action: ${action}`);
@@ -65,9 +82,10 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Settings() {
-  const { settings, planName, pricingPlanUrl } = useLoaderData<typeof loader>();
+  const { settings, planName, pricingPlanUrl, reinitializeStatus } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const [formValues, setFormValues] = useState(settings);
+  const [remainingMs, setRemainingMs] = useState(reinitializeStatus.remainingMs);
 
   const handleSubmit = useCallback(() => {
     fetcher.submit({...formValues, action: 'submit' }, { method: "post" });
@@ -88,6 +106,40 @@ export default function Settings() {
   const handleManagePricing = () => {
     window?.top?.location.replace(pricingPlanUrl);
   };
+
+  // Update countdown timer
+  useEffect(() => {
+    if (remainingMs <= 0) return;
+
+    const interval = setInterval(() => {
+      setRemainingMs((prev) => {
+        const newRemaining = prev - 1000;
+        return newRemaining <= 0 ? 0 : newRemaining;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [remainingMs]);
+
+  // Reset countdown when loader data updates
+  useEffect(() => {
+    setRemainingMs(reinitializeStatus.remainingMs);
+  }, [reinitializeStatus.remainingMs]);
+
+  const formatRemainingTime = (ms: number) => {
+    if (ms <= 0) return null;
+
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    }
+    return `${seconds}s`;
+  };
+
+  const canReinitializeNow = remainingMs <= 0;
+  const remainingTimeText = formatRemainingTime(remainingMs);
 
   return (
     <Page
@@ -321,19 +373,36 @@ export default function Settings() {
 
         <Layout.Section>
           <Card roundedAbove="sm">
-            <BlockStack gap="200">
-              <Text as="h2" variant="headingSm">Recommendations</Text>
-              <Box paddingBlockStart="200">
-                <Text as="p" variant="bodyMd">
-                  Reinitialize all recommendations based on the settings above.
-                </Text>
-              </Box>
+            <BlockStack gap="400">
+              <BlockStack gap="200">
+                <Text as="h2" variant="headingSm">Recommendations</Text>
+                <Box paddingBlockStart="200">
+                  <Text as="p" variant="bodyMd">
+                    Reinitialize all recommendations based on the settings above.
+                  </Text>
+                </Box>
+              </BlockStack>
+
+              {fetcher.data?.error && (
+                <Banner tone="critical">
+                  {fetcher.data.error}
+                  {remainingTimeText && ` Please wait ${remainingTimeText}.`}
+                </Banner>
+              )}
+
+              {!canReinitializeNow && !fetcher.data?.error && (
+                <Banner tone="info">
+                  You can reinitialize again in {remainingTimeText}.
+                </Banner>
+              )}
+
               <InlineStack align="end">
                 <Button
                   variant="secondary"
                   tone="critical"
                   onClick={() => fetcher.submit({ action: 'reinitialize' }, { method: "post" })}
-                  loading={fetcher.state === "submitting" }
+                  loading={fetcher.state === "submitting"}
+                  disabled={!canReinitializeNow || fetcher.state === "submitting"}
                   accessibilityLabel="Reinitialize"
                 >
                   Reinitialize
