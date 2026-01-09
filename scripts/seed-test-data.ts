@@ -1,5 +1,5 @@
 /**
- * Test Data Seeder for Impact Score Testing
+ * Test Data Seeder for Impact Score Testing (with productSnapshot)
  *
  * Usage: npx tsx scripts/seed-test-data.ts
  */
@@ -45,7 +45,7 @@ async function main() {
   });
   console.log('✅ Settings created');
 
-  // 3. Create Test Recommendations (various types)
+  // 3. Create Test Recommendations (with productSnapshot for impact calculation)
   const recommendations = [
     // PRICING - Sale at Loss (Critical)
     {
@@ -59,6 +59,15 @@ async function main() {
       subTypes: ['SALE_AT_LOSS'],
       status: 'PENDING',
       premium: false,
+      productSnapshot: {
+        title: 'Red T-Shirt',
+        description: 'Comfortable cotton t-shirt',
+        price: 10,
+        cost: 15, // Selling at loss!
+        compareAtPrice: 0,
+        inventoryQuantity: 50,
+        averageDailySales: 2,
+      },
     },
     // PRICING - Free Product
     {
@@ -72,6 +81,15 @@ async function main() {
       subTypes: ['FREE'],
       status: 'PENDING',
       premium: false,
+      productSnapshot: {
+        title: 'Blue Mug',
+        description: 'Ceramic mug',
+        price: 0, // Free!
+        cost: 5,
+        compareAtPrice: 0,
+        inventoryQuantity: 100,
+        averageDailySales: 1,
+      },
     },
     // PRICING - Cheap Product
     {
@@ -85,6 +103,15 @@ async function main() {
       subTypes: ['CHEAP'],
       status: 'PENDING',
       premium: false,
+      productSnapshot: {
+        title: 'Coffee Beans',
+        description: 'Premium arabica beans',
+        price: 10.5,
+        cost: 10,
+        compareAtPrice: 0,
+        inventoryQuantity: 200,
+        averageDailySales: 5,
+      },
     },
     // PRICING - High Discount
     {
@@ -98,6 +125,15 @@ async function main() {
       subTypes: ['HIGH_DISCOUNT'],
       status: 'PENDING',
       premium: false,
+      productSnapshot: {
+        title: 'Winter Jacket',
+        description: 'Warm winter jacket',
+        price: 20,
+        cost: 15,
+        compareAtPrice: 100, // 80% discount!
+        inventoryQuantity: 30,
+        averageDailySales: 2,
+      },
     },
     // TEXT - Short Title
     {
@@ -111,6 +147,15 @@ async function main() {
       subTypes: ['SHORT_TITLE'],
       status: 'PENDING',
       premium: false,
+      productSnapshot: {
+        title: 'Hat',
+        description: 'A comfortable hat',
+        price: 30,
+        cost: 15,
+        compareAtPrice: 0,
+        inventoryQuantity: 75,
+        averageDailySales: 2,
+      },
     },
     // TEXT - Long Description
     {
@@ -124,6 +169,15 @@ async function main() {
       subTypes: ['LONG_DESCRIPTION'],
       status: 'PENDING',
       premium: false,
+      productSnapshot: {
+        title: 'Premium Leather Wallet',
+        description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. More text here to make it very long description.',
+        price: 50,
+        cost: 25,
+        compareAtPrice: 0,
+        inventoryQuantity: 40,
+        averageDailySales: 1.5,
+      },
     },
     // MEDIA - No Image (Critical)
     {
@@ -137,6 +191,15 @@ async function main() {
       subTypes: ['NO_IMAGE'],
       status: 'PENDING',
       premium: false,
+      productSnapshot: {
+        title: 'Sunglasses Classic',
+        description: 'Classic sunglasses design',
+        price: 45,
+        cost: 20,
+        compareAtPrice: 0,
+        inventoryQuantity: 60,
+        averageDailySales: 3,
+      },
     },
     // STOCK - Out of Stock (Premium)
     {
@@ -150,6 +213,15 @@ async function main() {
       subTypes: ['NO_STOCK'],
       status: 'PENDING',
       premium: false,
+      productSnapshot: {
+        title: 'Running Shoes',
+        description: 'Professional running shoes',
+        price: 60,
+        cost: 30,
+        compareAtPrice: 0,
+        inventoryQuantity: 0, // Out of stock!
+        averageDailySales: 4,
+      },
     },
     // STOCK - Understock (Premium)
     {
@@ -163,6 +235,15 @@ async function main() {
       subTypes: ['UNDERSTOCK'],
       status: 'PENDING',
       premium: true,
+      productSnapshot: {
+        title: 'Wireless Headphones',
+        description: 'Noise-cancelling headphones',
+        price: 35,
+        cost: 20,
+        compareAtPrice: 0,
+        inventoryQuantity: 5, // Low stock!
+        averageDailySales: 2,
+      },
     },
     // STOCK - Passive (Premium)
     {
@@ -176,12 +257,21 @@ async function main() {
       subTypes: ['PASSIVE'],
       status: 'PENDING',
       premium: true,
+      productSnapshot: {
+        title: 'Old Model Phone Case',
+        description: 'Phone case for old model',
+        price: 20,
+        cost: 12,
+        compareAtPrice: 0,
+        inventoryQuantity: 50,
+        averageDailySales: 0.01, // Almost no sales
+      },
     },
   ];
 
   await prisma.recommendation.deleteMany({ where: { shop: shopDomain } });
   await prisma.recommendation.createMany({ data: recommendations as any });
-  console.log(`✅ Created ${recommendations.length} test recommendations`);
+  console.log(`✅ Created ${recommendations.length} test recommendations (with productSnapshot)`);
 
   // 4. Create Variant Metrics for stock recommendations
   const metrics = [
@@ -228,13 +318,14 @@ async function main() {
   console.log('\n🎉 Test data seeded successfully!');
   console.log(`\n📊 Summary:`);
   console.log(`   Shop: ${shopDomain}`);
-  console.log(`   Recommendations: ${recommendations.length}`);
+  console.log(`   Recommendations: ${recommendations.length} (all with productSnapshot)`);
   console.log(`   - PRICING: ${recommendations.filter(r => r.type === 'PRICING').length}`);
   console.log(`   - TEXT: ${recommendations.filter(r => r.type === 'TEXT').length}`);
   console.log(`   - MEDIA: ${recommendations.filter(r => r.type === 'MEDIA').length}`);
   console.log(`   - STOCK: ${recommendations.filter(r => r.type === 'STOCK').length}`);
   console.log(`   - Premium: ${recommendations.filter(r => r.premium).length}`);
   console.log(`   - Free: ${recommendations.filter(r => !r.premium).length}`);
+  console.log(`\n✨ All recommendations now have productSnapshot for offline impact calculation!`);
 }
 
 main()

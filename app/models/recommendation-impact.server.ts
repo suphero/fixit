@@ -128,22 +128,39 @@ export async function enrichRecommendationWithImpact(
   settings: Settings,
 ): Promise<RecommendationWithImpact> {
   try {
-    // Fetch product/variant data
-    const productData = await fetchRecommendationData(graphql, recommendation);
+    let productData = null;
 
+    // 1. Try to use cached snapshot first (faster + works even if product deleted)
+    if (recommendation.productSnapshot) {
+      console.log(`[Impact] Using cached snapshot for ${recommendation.id}`);
+      productData = recommendation.productSnapshot as any;
+    }
+
+    // 2. If no snapshot, fetch from Shopify API
     if (!productData) {
-      // Return with default impact if data fetch fails
-      return {
-        ...recommendation,
-        impact: {
-          score: 0,
-          potentialRevenue: 0,
-          impactType: "neutral",
-          calculation: "Unable to calculate",
-          assumptions: ["Product data unavailable"],
-          confidence: "low",
-        },
-      };
+      console.log(`[Impact] Fetching fresh data from Shopify for ${recommendation.id}`);
+      productData = await fetchRecommendationData(graphql, recommendation);
+
+      if (!productData) {
+        console.warn(`[Impact] Failed to fetch product data for recommendation ${recommendation.id}`, {
+          productId: recommendation.productId,
+          variantId: recommendation.variantId,
+          targetType: recommendation.targetType,
+        });
+
+        // Return with default impact if data fetch fails
+        return {
+          ...recommendation,
+          impact: {
+            score: 0,
+            potentialRevenue: 0,
+            impactType: "neutral",
+            calculation: "Unable to calculate - product data unavailable",
+            assumptions: ["Product may have been deleted", "Try regenerating recommendations"],
+            confidence: "low",
+          },
+        };
+      }
     }
 
     // Get average daily sales from metrics if variant exists

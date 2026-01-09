@@ -409,6 +409,15 @@ async function getProductRecommendations(
             subTypes,
             premium: false,
             status: RecommendationStatus.PENDING,
+            // Snapshot product data for impact calculation
+            productSnapshot: {
+              title: node.title,
+              description: node.description,
+              price: 0, // Products don't have price, variants do
+              cost: 0,
+              inventoryQuantity: node.totalInventory,
+              averageDailySales: 0.5, // Default
+            },
           });
         });
       }
@@ -481,6 +490,16 @@ async function getProductVariantRecommendations(
               subTypes,
               premium: false,
               status: RecommendationStatus.PENDING,
+              // Snapshot variant data for impact calculation
+              productSnapshot: {
+                title: node.product.title,
+                description: node.product.title, // Variants don't have description
+                price: parseFloat(node.price || "0"),
+                cost: parseFloat(node.inventoryItem?.unitCost?.amount || "0"),
+                compareAtPrice: parseFloat(node.compareAtPrice || "0"),
+                inventoryQuantity: node.inventoryQuantity || 0,
+                averageDailySales: 0.5, // Default, will be updated from metrics
+              },
             });
           },
         );
@@ -567,6 +586,16 @@ async function getPremiumRecommendations(
               subTypes,
               premium: true,
               status: RecommendationStatus.PENDING,
+              // Snapshot variant data for impact calculation (includes metrics!)
+              productSnapshot: {
+                title: node.product.title,
+                description: node.product.title,
+                price: parseFloat(node.price || "0"),
+                cost: parseFloat(node.inventoryItem?.unitCost?.amount || "0"),
+                compareAtPrice: parseFloat(node.compareAtPrice || "0"),
+                inventoryQuantity: node.inventoryQuantity || 0,
+                averageDailySales: variantMetric.averageDailySales, // Real metrics!
+              },
             });
           },
         );

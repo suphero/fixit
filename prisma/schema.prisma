@@ -48,6 +48,9 @@ model Recommendation {
   status              RecommendationStatus @default(PENDING)
   premium             Boolean? @default(false)
 
+  // Product Data Snapshot (for impact calculation without API calls)
+  productSnapshot     Json?                   // Cached product/variant data for impact calculation
+
   // Impact Score fields
   impactScore         Float?   @default(0)    // Overall impact score (0-100)
   potentialRevenue    Float?   @default(0)    // Estimated revenue increase in shop currency
