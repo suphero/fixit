@@ -47,6 +47,13 @@ model Recommendation {
   subTypes            RecommendationSubType[]
   status              RecommendationStatus @default(PENDING)
   premium             Boolean? @default(false)
+
+  // Impact Score fields
+  impactScore         Float?   @default(0)    // Overall impact score (0-100)
+  potentialRevenue    Float?   @default(0)    // Estimated revenue increase in shop currency
+  impactType          String?  @default("neutral") // "positive" | "negative" | "neutral"
+  impactMetadata      Json?                   // Additional metadata for impact calculation
+
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -56,6 +63,7 @@ model Recommendation {
   @@index([shop, productId])
   @@index([shop, variantId])
   @@index([createdAt])
+  @@index([shop, impactScore])
 }
 
 enum TargetType {

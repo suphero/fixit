@@ -35,6 +35,11 @@ import { UpdateStockModal } from "./app.reco.update-stock";
 import { getShop } from "../models/shop.server";
 import type { RecommendationCount } from "../models/recommendation.business.server";
 import { SHOPIFY_APP_HANDLE } from "../constants/config.server";
+import {
+  enrichRecommendationsWithImpact,
+  calculateTotalImpact,
+  type RecommendationWithImpact,
+} from "../models/recommendation-impact.server";
 
 type LoaderData = {
   shop: string;
@@ -55,13 +60,20 @@ type LoaderData = {
   };
   activeTab?: {
     type: RecommendationType;
-    data: Recommendation[];
+    data: RecommendationWithImpact[];
     count: number;
     subTypes: {
       type: RecommendationSubType;
       label: string;
     }[];
-  }
+  };
+  totalImpact?: {
+    totalRevenue: number;
+    positiveImpact: number;
+    negativeImpact: number;
+    averageScore: number;
+    count: number;
+  };
   isPremium: boolean;
   pricingPlanUrl: string;
 };
@@ -102,15 +114,28 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const pricingPlanUrl = `https://admin.shopify.com/store/${shopId}/charges/${SHOPIFY_APP_HANDLE}/pricing_plans`;
 
   let activeTab = null;
+  let totalImpact = null;
+
   if (type && TAB_DEFINITIONS[type]) {
     const recommendations = await getRecommendationsByType(request, type, "PENDING", page, size);
     // Filter out premium recommendations for non-premium users
     const filteredData = isPremium ? recommendations : recommendations.filter(r => !r.premium);
 
+    // Enrich recommendations with impact data
+    const enrichedData = await enrichRecommendationsWithImpact(
+      admin,
+      session.shop,
+      filteredData,
+      settings,
+    );
+
+    // Calculate total impact for current page
+    totalImpact = calculateTotalImpact(enrichedData);
+
     activeTab = {
       type,
       count: isPremium ? typeCounts[type].all : typeCounts[type].free,
-      data: filteredData,
+      data: enrichedData,
       subTypes: TAB_DEFINITIONS[type].subTypes,
     };
   }
@@ -124,6 +149,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     counts: typeCounts,
     settings,
     activeTab,
+    totalImpact,
     isPremium,
     pricingPlanUrl,
   };
@@ -164,8 +190,9 @@ export default function Recommendations() {
   }, [tabs.length, selectedTab, page]);
 
   const activeTabData = fetcher.data?.activeTab ?? data.activeTab;
-  const recommendations: Recommendation[] = activeTabData?.data ?? [];
+  const recommendations: RecommendationWithImpact[] = activeTabData?.data ?? [];
   const totalCount = activeTabData?.count ?? 0;
+  const totalImpact = fetcher.data?.totalImpact ?? data.totalImpact;
   const isLoading = fetcher.state !== "idle";
 
   const handleTabChange = (index: number) => {
@@ -182,69 +209,95 @@ export default function Recommendations() {
   const truncate = (str: string, length = 50) =>
     str?.length > length ? str.slice(0, length) + "…" : str || "";
 
+  const formatCurrency = (amount: number) => {
+    return data.shopData.moneyFormat
+      .replace("{{amount}}", amount.toFixed(2))
+      .replace("{{amount_no_decimals}}", Math.round(amount).toString());
+  };
+
   const paginationLabel = `Page ${page} of ${Math.ceil(totalCount / PAGE_SIZE)} | Showing ${
     recommendations.length
   } of ${totalCount} items`;
 
-  const rowMarkup = recommendations.map((recommendation, index) => (
-    <IndexTable.Row id={recommendation.id} key={recommendation.id} position={index}>
-      <IndexTable.Cell>
-      <Tooltip content={recommendation.targetTitle}>
-        <Button
-          variant="plain"
-          onClick={() => window.open(getShopifyAdminUrl(data.shop, recommendation.targetUrl), "_blank")}
-        >
-          {truncate(recommendation.targetTitle, 50)}
-        </Button>
-      </Tooltip>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Badge
-          icon={recommendation.targetType === "PRODUCT" ? ProductIcon : VariantIcon}
-          tone="info"
-        >
-          {recommendation.targetType === "PRODUCT" ? "Product" : "Variant"}
-        </Badge>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <ButtonGroup>
-        {recommendation.subTypes.map((subType) => {
-          const subTypeDef = getSubTypeDefinition(subType);
-          return (
-            <Badge key={subType} icon={subTypeDef.icon} tone={subTypeDef.tone}>
-              {subTypeDef.label}
+  const rowMarkup = recommendations.map((recommendation, index) => {
+    const impactScore = recommendation.impact.score;
+    const impactTone = impactScore >= 80 ? "critical" : impactScore >= 60 ? "warning" : impactScore >= 40 ? "info" : "info";
+    const impactIcon = recommendation.impact.impactType === "negative" ? "⚠️" : recommendation.impact.impactType === "positive" ? "📈" : "ℹ️";
+
+    return (
+      <IndexTable.Row id={recommendation.id} key={recommendation.id} position={index}>
+        <IndexTable.Cell>
+        <Tooltip content={recommendation.targetTitle}>
+          <Button
+            variant="plain"
+            onClick={() => window.open(getShopifyAdminUrl(data.shop, recommendation.targetUrl), "_blank")}
+          >
+            {truncate(recommendation.targetTitle, 50)}
+          </Button>
+        </Tooltip>
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          <Badge
+            icon={recommendation.targetType === "PRODUCT" ? ProductIcon : VariantIcon}
+            tone="info"
+          >
+            {recommendation.targetType === "PRODUCT" ? "Product" : "Variant"}
+          </Badge>
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          <ButtonGroup>
+          {recommendation.subTypes.map((subType) => {
+            const subTypeDef = getSubTypeDefinition(subType);
+            return (
+              <Badge key={subType} icon={subTypeDef.icon} tone={subTypeDef.tone}>
+                {subTypeDef.label}
+              </Badge>
+            );
+          })}
+          </ButtonGroup>
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          <Tooltip content={`${recommendation.impact.calculation}\nConfidence: ${recommendation.impact.confidence}`}>
+            <Badge tone={impactTone}>
+              {impactIcon} {impactScore}/100
             </Badge>
-          );
-        })}
-        </ButtonGroup>
-      </IndexTable.Cell>
-      <IndexTable.Cell>{new Date(recommendation.createdAt).toLocaleDateString()}</IndexTable.Cell>
-      <IndexTable.Cell>
-        <ButtonGroup>
-          {recommendation.type === "PRICING" && (
-            <Button onClick={() => setSelectedPricingRecommendation(recommendation)} variant="primary">Fix</Button>
-          )}
-          {recommendation.type === "TEXT" && (
-            <Button onClick={() => setSelectedTextRecommendation(recommendation)} variant="primary">Fix</Button>
-          )}
-          {recommendation.type === "MEDIA" && (
-            <Button onClick={() => setSelectedMediaRecommendation(recommendation)} variant="primary">Fix</Button>
-          )}
-          {recommendation.type === "STOCK" && (() => {
-            if (recommendation.subTypes.includes("PASSIVE")) {
-              if (recommendation.targetType === "PRODUCT") {
-                return <Button onClick={() => setSelectedArchiveRecommendation(recommendation)} variant="primary">Archive</Button>;
+          </Tooltip>
+        </IndexTable.Cell>
+        <IndexTable.Cell>
+          <Tooltip content={recommendation.impact.assumptions.join("\n")}>
+            <Text as="span" fontWeight="semibold">
+              {formatCurrency(recommendation.impact.potentialRevenue)}/mo
+            </Text>
+          </Tooltip>
+        </IndexTable.Cell>
+        <IndexTable.Cell>{new Date(recommendation.createdAt).toLocaleDateString()}</IndexTable.Cell>
+        <IndexTable.Cell>
+          <ButtonGroup>
+            {recommendation.type === "PRICING" && (
+              <Button onClick={() => setSelectedPricingRecommendation(recommendation)} variant="primary">Fix</Button>
+            )}
+            {recommendation.type === "TEXT" && (
+              <Button onClick={() => setSelectedTextRecommendation(recommendation)} variant="primary">Fix</Button>
+            )}
+            {recommendation.type === "MEDIA" && (
+              <Button onClick={() => setSelectedMediaRecommendation(recommendation)} variant="primary">Fix</Button>
+            )}
+            {recommendation.type === "STOCK" && (() => {
+              if (recommendation.subTypes.includes("PASSIVE")) {
+                if (recommendation.targetType === "PRODUCT") {
+                  return <Button onClick={() => setSelectedArchiveRecommendation(recommendation)} variant="primary">Archive</Button>;
+                } else {
+                  return <Button onClick={() => setSelectedArchiveRecommendation(recommendation)} variant="primary">Delete</Button>;
+                }
               } else {
-                return <Button onClick={() => setSelectedArchiveRecommendation(recommendation)} variant="primary">Delete</Button>;
+                return <Button onClick={() => setSelectedStockRecommendation(recommendation)} variant="primary">Fix</Button>;
               }
-            } else {
-              return <Button onClick={() => setSelectedStockRecommendation(recommendation)} variant="primary">Fix</Button>;
-            }
-          })()}
-        </ButtonGroup>
-      </IndexTable.Cell>
-    </IndexTable.Row>
-  ));
+            })()}
+          </ButtonGroup>
+        </IndexTable.Cell>
+      </IndexTable.Row>
+    );
+  });
 
   if (tabs.length === 0) {
     return (
@@ -256,6 +309,24 @@ export default function Recommendations() {
 
   return (
     <Page title="Recommendations">
+      {totalImpact && totalImpact.count > 0 && (
+        <Banner
+          title={`💰 Potential Revenue Impact: ${formatCurrency(totalImpact.totalRevenue)}/month`}
+          tone="success"
+        >
+          <BlockStack gap="200">
+            <Text as="p">
+              Fixing these {totalImpact.count} recommendations on this page could impact your revenue by approximately{" "}
+              <Text as="span" fontWeight="bold">{formatCurrency(totalImpact.totalRevenue)}</Text> per month.
+            </Text>
+            <Text as="p" tone="subdued">
+              {totalImpact.positiveImpact > 0 && `📈 Potential gains: ${formatCurrency(totalImpact.positiveImpact)}/mo`}
+              {totalImpact.positiveImpact > 0 && totalImpact.negativeImpact > 0 && " | "}
+              {totalImpact.negativeImpact > 0 && `⚠️ Preventing losses: ${formatCurrency(totalImpact.negativeImpact)}/mo`}
+            </Text>
+          </BlockStack>
+        </Banner>
+      )}
       {!data.isPremium && Object.values(data.counts).some(count => count.premium > 0) && (
         <Banner
           title="Premium Recommendations Available"
@@ -320,6 +391,8 @@ export default function Recommendations() {
           { title: "Title" },
           { title: "Target" },
           { title: "Issue" },
+          { title: "Impact" },
+          { title: "Potential Revenue" },
           { title: "Date Created" },
           { title: "" },
         ]}
