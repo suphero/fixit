@@ -58,4 +58,3 @@ embedded = false
 [build]
 dev_store_url = "smart-forecast-demo.myshopify.com"
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
