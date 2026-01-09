@@ -22,6 +22,7 @@ const shopify = shopifyApp({
       await createShop(session.shop);
       await createSettings(session.shop);
       await initializeAll(admin.graphql, session.shop);
+      await registerWebhooks({ session });
     },
   },
   sessionStorage: new PrismaSessionStorage(prisma),
@@ -34,6 +35,10 @@ const shopify = shopifyApp({
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
     : {}),
 });
+
+if (!process.env.SHOPIFY_API_SECRET) {
+  console.warn("SHOPIFY_API_SECRET is not set. Webhook authentication will fail.");
+}
 
 export default shopify;
 export const apiVersion = ApiVersion.October24;

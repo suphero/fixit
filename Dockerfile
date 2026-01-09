@@ -15,13 +15,18 @@ ENV NODE_ENV=production
 
 COPY package.json package-lock.json* ./
 
-RUN npm ci --omit=dev && npm cache clean --force
-# Remove CLI packages since we don't need them in production by default.
-# Remove this line if you want to run CLI commands in your container.
-RUN npm remove @shopify/cli
+# Install all dependencies (including devDependencies) for the build
+RUN npm ci
 
 COPY . .
 
+# Run the build process
 RUN npm run build
+
+# Prune dev dependencies and clean cache for production
+RUN npm prune --omit=dev && npm cache clean --force
+
+# Remove CLI packages since we don't need them in production
+RUN npm remove @shopify/cli
 
 CMD ["npm", "run", "docker-start"]
