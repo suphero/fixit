@@ -34,7 +34,13 @@ export async function getRabbitMQConnection(): Promise<amqp.Connection> {
   global.rabbitmqConnectionPromise = (async () => {
 
     try {
-      const conn = await amqp.connect(url);
+      // Add timeout to connection attempt (10 seconds)
+      const connectPromise = amqp.connect(url);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('RabbitMQ connection timeout after 10s')), 10000)
+      );
+
+      const conn = await Promise.race([connectPromise, timeoutPromise]);
       console.log("RabbitMQ connected successfully");
 
       conn.on("close", () => {
