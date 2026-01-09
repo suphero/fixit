@@ -123,7 +123,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     // Enrich recommendations with impact data
     const enrichedData = await enrichRecommendationsWithImpact(
-      admin,
+      admin.graphql,
       session.shop,
       filteredData,
       settings,
