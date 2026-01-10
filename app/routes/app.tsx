@@ -11,11 +11,16 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const { session } = await authenticate.admin(request);
-    console.log('[app.tsx] Authentication successful for shop:', session.shop);
+    console.log('[app.tsx] Starting authentication for URL:', request.url);
+    const result = await authenticate.admin(request);
+    console.log('[app.tsx] Authentication successful for shop:', result.session.shop);
     return { apiKey: process.env.SHOPIFY_API_KEY || "" };
   } catch (error) {
-    console.error('[app.tsx] Authentication failed:', error);
+    console.error('[app.tsx] Authentication failed with error:', error);
+    if (error instanceof Response) {
+      console.error('[app.tsx] Error is a Response with status:', error.status);
+      console.error('[app.tsx] Response headers:', Object.fromEntries(error.headers.entries()));
+    }
     throw error;
   }
 };

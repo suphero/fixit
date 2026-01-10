@@ -32,6 +32,10 @@ export class LoggingSessionStorage implements SessionStorage {
         id: session.id,
         shop: session.shop,
         isOnline: session.isOnline,
+        scope: session.scope,
+        expires: session.expires,
+        isExpired: session.expires ? new Date(session.expires) < new Date() : false,
+        accessToken: session.accessToken ? '***' + session.accessToken.slice(-4) : 'none',
       });
     } else {
       console.log('[SessionStorage] Session not found for ID:', id);
