@@ -4,8 +4,7 @@ import {
   AppDistribution,
   shopifyApp,
 } from "@shopify/shopify-app-remix/server";
-import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
-import prisma from "./db.server";
+import { LoggingSessionStorage } from "./session-storage.server";
 import { createShop } from "./models/shop.business.server";
 import { createSettings } from "./models/settings.business.server";
 import { initializeAll } from "./models/recommendation.business.server";
@@ -41,7 +40,7 @@ const shopify = shopifyApp({
       }
     },
   },
-  sessionStorage: new PrismaSessionStorage(prisma),
+  sessionStorage: new LoggingSessionStorage(),
   distribution: AppDistribution.AppStore,
   future: {
     removeRest: true,
