@@ -3,7 +3,7 @@
 client_id = "d713d4c7b0fc50d65d4a1554ba059827"
 application_url = "https://acids-storm-tourist-adipex.trycloudflare.com"
 embedded = true
-name = "[DEV] Smart Forecast"
+name = "[DEV] FixIt - Shop Optimizer"
 handle = "dev-p-smart-forecast"
 
 [access_scopes]

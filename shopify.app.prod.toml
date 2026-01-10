@@ -3,7 +3,7 @@
 client_id = "887110872f7dd4f2d175308b5bef27aa"
 application_url = "https://fixit-prod.suphero.online"
 embedded = true
-name = "Smart Forecast"
+name = "FixIt - Shop Optimizer"
 handle = "smart-forecast"
 
 [access_scopes]
