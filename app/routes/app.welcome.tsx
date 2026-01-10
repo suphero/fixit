@@ -22,21 +22,32 @@ import { getShop, completeOnboarding } from "../models/shop.business.server";
 import { getRecommendationCounts } from "../models/recommendation.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { session } = await authenticate.admin(request);
-  const shop = await getShop(session.shop);
+  try {
+    console.log('[app.welcome] Starting authentication...');
+    const { session } = await authenticate.admin(request);
+    console.log('[app.welcome] Authentication successful for shop:', session.shop);
 
-  // If onboarding is already completed, redirect to recommendations
-  if (shop.onboardingCompleted) {
-    return redirect("/app/reco");
+    const shop = await getShop(session.shop);
+    console.log('[app.welcome] Shop loaded:', { shop: session.shop, onboardingCompleted: shop.onboardingCompleted });
+
+    // If onboarding is already completed, redirect to recommendations
+    if (shop.onboardingCompleted) {
+      console.log('[app.welcome] Onboarding already completed, redirecting to /app/reco');
+      return redirect("/app/reco");
+    }
+
+    // Check if recommendations are being generated
+    const counts = await getRecommendationCounts(request, RecommendationStatus.PENDING);
+    const totalRecommendations = Object.values(counts).reduce((sum, count) => sum + count.all, 0);
+    console.log('[app.welcome] Total recommendations:', totalRecommendations);
+
+    return {
+      hasRecommendations: totalRecommendations > 0,
+    };
+  } catch (error) {
+    console.error('[app.welcome] Error in loader:', error);
+    throw error;
   }
-
-  // Check if recommendations are being generated
-  const counts = await getRecommendationCounts(request, RecommendationStatus.PENDING);
-  const totalRecommendations = Object.values(counts).reduce((sum, count) => sum + count.all, 0);
-
-  return {
-    hasRecommendations: totalRecommendations > 0,
-  };
 }
 
 export async function action({ request }: ActionFunctionArgs) {

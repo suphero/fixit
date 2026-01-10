@@ -10,6 +10,15 @@ import { createShop } from "./models/shop.business.server";
 import { createSettings } from "./models/settings.business.server";
 import { initializeAll } from "./models/recommendation.business.server";
 
+console.log('[shopify.server] Initializing Shopify App with:', {
+  apiKey: process.env.SHOPIFY_API_KEY,
+  hasApiSecret: !!process.env.SHOPIFY_API_SECRET,
+  apiVersion: ApiVersion.October24,
+  scopes: process.env.SCOPES?.split(","),
+  appUrl: process.env.SHOPIFY_APP_URL,
+  distribution: AppDistribution.AppStore,
+});
+
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET ?? "",
@@ -19,10 +28,17 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   hooks: {
     afterAuth: async ({ session, admin }) => {
-      await createShop(session.shop);
-      await createSettings(session.shop);
-      await initializeAll(admin.graphql, session.shop);
-      await registerWebhooks({ session });
+      console.log('[shopify.server] afterAuth hook called for shop:', session.shop);
+      try {
+        await createShop(session.shop);
+        await createSettings(session.shop);
+        await initializeAll(admin.graphql, session.shop);
+        await registerWebhooks({ session });
+        console.log('[shopify.server] afterAuth hook completed successfully');
+      } catch (error) {
+        console.error('[shopify.server] Error in afterAuth hook:', error);
+        throw error;
+      }
     },
   },
   sessionStorage: new PrismaSessionStorage(prisma),

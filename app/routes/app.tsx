@@ -10,9 +10,14 @@ import { authenticate } from "../shopify.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  try {
+    const { session } = await authenticate.admin(request);
+    console.log('[app.tsx] Authentication successful for shop:', session.shop);
+    return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  } catch (error) {
+    console.error('[app.tsx] Authentication failed:', error);
+    throw error;
+  }
 };
 
 export default function App() {
