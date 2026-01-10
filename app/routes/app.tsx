@@ -11,7 +11,19 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
+    const url = new URL(request.url);
     console.log('[app.tsx] Starting authentication for URL:', request.url);
+    console.log('[app.tsx] Request headers:', {
+      host: request.headers.get('host'),
+      'x-forwarded-proto': request.headers.get('x-forwarded-proto'),
+      'x-forwarded-host': request.headers.get('x-forwarded-host'),
+    });
+    console.log('[app.tsx] URL search params:', {
+      shop: url.searchParams.get('shop'),
+      host: url.searchParams.get('host'),
+      embedded: url.searchParams.get('embedded'),
+      hasIdToken: !!url.searchParams.get('id_token'),
+    });
     const result = await authenticate.admin(request);
     console.log('[app.tsx] Authentication successful for shop:', result.session.shop);
     return { apiKey: process.env.SHOPIFY_API_KEY || "" };
