@@ -1,5 +1,4 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { redirect } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import {
   Page,
@@ -24,7 +23,7 @@ import { getRecommendationCounts } from "../models/recommendation.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
     console.log('[app.welcome] Starting authentication...');
-    const { session } = await authenticate.admin(request);
+    const { session, redirect } = await authenticate.admin(request);
     console.log('[app.welcome] Authentication successful for shop:', session.shop);
 
     const shop = await getShop(session.shop);
@@ -51,7 +50,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { session } = await authenticate.admin(request);
+  const { session, redirect } = await authenticate.admin(request);
 
   await completeOnboarding(session.shop);
 
