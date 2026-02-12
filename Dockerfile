@@ -16,7 +16,7 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json* ./
 
 # Install all dependencies (including devDependencies) for the build
-RUN npm ci
+RUN npm ci --include=dev
 
 COPY . .
 
