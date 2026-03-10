@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import { getBulkOperationUrl, processBulkOperationResult } from "../models/variant.business.server";
+import { getBulkOperationUrl } from "../models/variant.business.server";
+import { publish as publishBulkResult } from "../consumers/bulk-result.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
@@ -10,7 +11,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (payload.status === 'completed' && !payload.error_code && admin) {
       const url = await getBulkOperationUrl(admin.graphql, payload.admin_graphql_api_id);
       if (url) {
-        await processBulkOperationResult(url, shop);
+        await publishBulkResult(url, shop);
       }
     } else if (payload.error_code) {
       console.error(`Bulk operation failed for ${shop} with error: ${payload.error_code}`);

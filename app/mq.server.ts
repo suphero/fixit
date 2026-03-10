@@ -1,4 +1,5 @@
 import amqp from "amqplib";
+import * as bulkResultConsumer from "./consumers/bulk-result.server";
 import * as deleteShopConsumer from "./consumers/delete-shop.server";
 import * as generateRecoConsumer from "./consumers/generate-reco.server";
 import * as scopesUpdateConsumer from "./consumers/scopes-update.server";
@@ -9,7 +10,7 @@ declare global {
   var rabbitmqConnectionPromise: Promise<amqp.Connection> | undefined;
 }
 
-type RABBITMQ_QUEUE = "delete_shop" | "generate_reco" | "scopes_update" | "subscription_update";
+type RABBITMQ_QUEUE = "bulk_result" | "delete_shop" | "generate_reco" | "scopes_update" | "subscription_update";
 
 const channels: Record<string, amqp.Channel> = {};
 
@@ -140,6 +141,7 @@ async function startQueueConsumers() {
   console.log('Starting queue consumers...');
   // Use Promise.allSettled to ensure we try to start all consumers even if one fails
   await Promise.allSettled([
+    bulkResultConsumer.consume(),
     deleteShopConsumer.consume(),
     generateRecoConsumer.consume(),
     scopesUpdateConsumer.consume(),
