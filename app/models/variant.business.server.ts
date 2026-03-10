@@ -440,14 +440,11 @@ export async function processBulkOperationResult(
   shop: string,
 ): Promise<void> {
   const response = await fetch(url);
-  if (!response.body) {
-    throw new Error('Response body is null');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch bulk operation result: ${response.status}`);
   }
 
-  // Create a streaming reader
-  const reader = response.body
-    .pipeThrough(new TextDecoderStream())
-    .getReader();
+  const text = await response.text();
 
   const variantMetrics = new Map<string, {
     variantCreatedAt: Date;
@@ -460,45 +457,21 @@ export async function processBulkOperationResult(
   let currentOrderDate: Date | null = null;
   let processedLines = 0;
   const BATCH_SIZE = 1000;
-  let buffer = ''; // Add buffer for incomplete lines
 
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) {
-        // Process any remaining complete lines in buffer
-        if (buffer.trim()) {
-          processLine(buffer.trim());
-        }
-        break;
-      }
-
-      // Append new chunk to buffer and split into lines
-      buffer += value;
-      const lines = buffer.split('\n');
-
-      // Process all complete lines except the last one
-      // (which might be incomplete)
-      for (let i = 0; i < lines.length - 1; i++) {
-        const line = lines[i].trim();
-        if (line) {
-          processLine(line);
-        }
-      }
-
-      // Keep the last line in buffer as it might be incomplete
-      buffer = lines[lines.length - 1];
+  const lines = text.split('\n');
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line) {
+      processLine(line);
     }
-
-    // Process remaining variants
-    if (variantMetrics.size > 0) {
-      await processBatch(variantMetrics, shop);
-    }
-
-    await publish(shop, { premium: true });
-  } finally {
-    reader.releaseLock();
   }
+
+  // Process remaining variants
+  if (variantMetrics.size > 0) {
+    await processBatch(variantMetrics, shop);
+  }
+
+  await publish(shop, { premium: true });
 
   function processLine(line: string) {
     try {
