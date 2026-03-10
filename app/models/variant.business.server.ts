@@ -2,6 +2,7 @@ import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
 import db from "../db.server";
 import * as shopBusiness from "./shop.business.server";
 import { publish } from "app/consumers/generate-reco.server";
+import { withThrottleRetry } from "../utils/graphql.server";
 
 interface BulkVariantMetrics {
   variantId: string;
@@ -53,8 +54,10 @@ export async function fetchVariant(
   if (params.productId) {
     query += ` AND product_id:${params.productId}`;
   }
-  const response = await graphql(
-    `#graphql
+  const { data } = await withThrottleRetry(
+    async () => {
+      const response = await graphql(
+        `#graphql
     query getProductVariants($cursor: String, $query: String) {
       productVariants(first: 50, after: $cursor, query: $query) {
         edges {
@@ -83,9 +86,12 @@ export async function fetchVariant(
         }
       }
     }`,
-    { variables: { cursor: params.cursor, query } },
+        { variables: { cursor: params.cursor, query } },
+      );
+      return response.json();
+    },
+    "fetchVariant",
   );
-  const { data } = await response.json();
   return data.productVariants;
 }
 

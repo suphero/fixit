@@ -29,7 +29,7 @@ export const consume = () =>
       }
 
       const { admin } = await unauthenticated.admin(content.shop);
-      generateRecommendations(admin.graphql, content.shop, content.params);
+      await generateRecommendations(admin.graphql, content.shop, content.params);
     } catch (error) {
       console.error("Error generating recommendations:", error);
     }

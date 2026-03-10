@@ -1,4 +1,5 @@
 import type { AdminGraphqlClient } from "@shopify/shopify-app-remix/server";
+import { withThrottleRetry } from "../utils/graphql.server";
 
 export async function getDetails(graphql: AdminGraphqlClient, id: string) {
   const response = await graphql(
@@ -68,8 +69,10 @@ export async function fetchProduct(
   if (params.productId) {
     query += ` id:${params.productId}`;
   }
-  const response = await graphql(
-    `#graphql
+  const { data } = await withThrottleRetry(
+    async () => {
+      const response = await graphql(
+        `#graphql
     query getProducts($cursor: String, $query: String) {
       products(first: 50, after: $cursor, query: $query) {
         edges {
@@ -89,9 +92,12 @@ export async function fetchProduct(
         }
       }
     }`,
-    { variables: { cursor: params.cursor, query } },
+        { variables: { cursor: params.cursor, query } },
+      );
+      return response.json();
+    },
+    "fetchProduct",
   );
-  const { data } = await response.json();
   return data.products;
 }
 
